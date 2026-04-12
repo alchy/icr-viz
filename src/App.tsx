@@ -227,13 +227,15 @@ export default function App() {
 
   // Actions
   const toggleAnchor = (midi: number, bankId: string) => {
+    const exists = anchorRefs.some(ref => ref.midi === midi && ref.bankId === bankId);
     setAnchorRefs(prev => {
-      const exists = prev.some(ref => ref.midi === midi && ref.bankId === bankId);
       return exists
         ? prev.filter(ref => !(ref.midi === midi && ref.bankId === bankId))
         : [...prev, { midi, bankId }];
     });
     setIsCorrected(false);
+    const bankName = loadedBanks.find(b => b.id === bankId)?.name || bankId;
+    addLog(`Anchor ${exists ? 'removed' : 'added'}: MIDI ${midi} from ${bankName}`, 'info');
   };
 
   const handleAutoSelect = async () => {
@@ -538,7 +540,7 @@ export default function App() {
                     <button
                       type="button"
                       className={`w-4 h-4 rounded-full border-2 flex-shrink-0 transition-colors ${isActive ? 'border-emerald-500 bg-emerald-500' : 'border-zinc-300 bg-white hover:border-emerald-400'}`}
-                      onClick={() => setActiveBankPath(bank.path)}
+                      onClick={() => { setActiveBankPath(bank.path); addLog(`Anchor source bank set to ${bank.name}`, 'info'); }}
                       title="Set as anchor source bank"
                     >
                       {isActive && <span className="block w-1.5 h-1.5 bg-white rounded-full mx-auto" />}
@@ -590,7 +592,7 @@ export default function App() {
                     ? 'bg-blue-600 text-white border-blue-600'
                     : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
                 }`}
-                onClick={() => { setDetectionMethod(opt.value); setIsCorrected(false); }}
+                onClick={() => { setDetectionMethod(opt.value); setIsCorrected(false); addLog(`Detection method changed to ${opt.value}`, 'info'); }}
                 disabled={isProcessing}
               >
                 <div className="font-bold">{opt.label}</div>
@@ -616,6 +618,7 @@ export default function App() {
               if (typeof v === 'number' && !isNaN(v)) {
                 setThreshold(v);
                 setIsCorrected(false);
+                addLog(`Deviation threshold changed to ${(v * 100).toFixed(1)}%`, 'debug');
               }
             }}
             disabled={isProcessing}
@@ -734,7 +737,7 @@ export default function App() {
                     ? 'bg-blue-600 text-white border-blue-600'
                     : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
                 }`}
-                onClick={() => { setCorrectionMethod(method); setIsCorrected(false); }}
+                onClick={() => { setCorrectionMethod(method); setIsCorrected(false); addLog(`Correction method changed to ${label}`, 'info'); }}
               >
                 {label}
               </button>
@@ -754,7 +757,7 @@ export default function App() {
               min={0.5} max={4} step={0.1}
               onValueChange={(val: any) => {
                 const v = Array.isArray(val) ? val[0] : val;
-                if (typeof v === 'number' && !isNaN(v)) { setZScoreLimit(v); setIsCorrected(false); }
+                if (typeof v === 'number' && !isNaN(v)) { setZScoreLimit(v); setIsCorrected(false); addLog(`Z-Score limit changed to ${v.toFixed(1)}σ`, 'debug'); }
               }}
             />
           </div>
@@ -771,7 +774,7 @@ export default function App() {
               min={0.5} max={3} step={0.1}
               onValueChange={(val: any) => {
                 const v = Array.isArray(val) ? val[0] : val;
-                if (typeof v === 'number' && !isNaN(v)) { setIqrMultiplier(v); setIsCorrected(false); }
+                if (typeof v === 'number' && !isNaN(v)) { setIqrMultiplier(v); setIsCorrected(false); addLog(`IQR multiplier changed to ${v.toFixed(1)}x`, 'debug'); }
               }}
             />
           </div>
@@ -813,7 +816,7 @@ export default function App() {
                   ? 'bg-blue-600 text-white border-blue-600'
                   : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
               }`}
-              onClick={() => setProjectionMethod(m)}
+              onClick={() => { setProjectionMethod(m); addLog(`Projection method changed to ${label}`, 'info'); }}
             >
               {label}
             </button>
@@ -827,7 +830,7 @@ export default function App() {
               <select
                 className="w-full mt-1 text-[10px] bg-zinc-50 border border-zinc-200 rounded px-1 py-1"
                 value={projParamX}
-                onChange={e => setProjParamX(e.target.value)}
+                onChange={e => { setProjParamX(e.target.value); addLog(`Projection X axis changed to ${e.target.value}`, 'debug'); }}
               >
                 {projParams.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
@@ -837,7 +840,7 @@ export default function App() {
               <select
                 className="w-full mt-1 text-[10px] bg-zinc-50 border border-zinc-200 rounded px-1 py-1"
                 value={projParamY}
-                onChange={e => setProjParamY(e.target.value)}
+                onChange={e => { setProjParamY(e.target.value); addLog(`Projection Y axis changed to ${e.target.value}`, 'debug'); }}
               >
                 {projParams.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
@@ -861,7 +864,7 @@ export default function App() {
         <CardContent className="pt-4">
           <DatasetOverview
             results={analysisResults}
-            onSelectMidi={(midi, bankId) => { setSelectedMidi(midi); setSelectedBankId(bankId); }}
+            onSelectMidi={(midi, bankId) => { setSelectedMidi(midi); setSelectedBankId(bankId); addLog(`Selected sample: MIDI ${midi} from ${loadedBanks.find(b => b.id === bankId)?.name || bankId}`, 'debug'); }}
             selectedMidi={selectedMidi}
             threshold={threshold}
           />
@@ -884,7 +887,7 @@ export default function App() {
               data={projectedBefore}
               xLabel={projectionMethod === 'parameter-pair' ? projParamX : projectionMethod === 'spectral' ? 'Spectral Centroid' : 'PC1'}
               yLabel={projectionMethod === 'parameter-pair' ? projParamY : projectionMethod === 'spectral' ? 'Spectral Spread' : 'PC2'}
-              onClickPoint={(p) => { setSelectedMidi(p.midi); setSelectedBankId(p.bankId); }}
+              onClickPoint={(p) => { setSelectedMidi(p.midi); setSelectedBankId(p.bankId); addLog(`Cluster point selected: MIDI ${p.midi} from ${p.bankName}`, 'debug'); }}
             />
             {isCorrected && (
               <ClusterProjection
@@ -892,7 +895,7 @@ export default function App() {
                 data={projectedAfter}
                 xLabel={projectionMethod === 'parameter-pair' ? projParamX : projectionMethod === 'spectral' ? 'Spectral Centroid' : 'PC1'}
                 yLabel={projectionMethod === 'parameter-pair' ? projParamY : projectionMethod === 'spectral' ? 'Spectral Spread' : 'PC2'}
-                onClickPoint={(p) => { setSelectedMidi(p.midi); setSelectedBankId(p.bankId); }}
+                onClickPoint={(p) => { setSelectedMidi(p.midi); setSelectedBankId(p.bankId); addLog(`Cluster point selected: MIDI ${p.midi} from ${p.bankName}`, 'debug'); }}
               />
             )}
           </div>
@@ -917,7 +920,7 @@ export default function App() {
               anchorRefs={anchorRefs}
               width={700}
               height={350}
-              onClickNode={(midi, bankId) => { setSelectedMidi(midi); setSelectedBankId(bankId); }}
+              onClickNode={(midi, bankId) => { setSelectedMidi(midi); setSelectedBankId(bankId); addLog(`Tension graph node selected: MIDI ${midi}`, 'debug'); }}
             />
           </CardContent>
         </Card>
@@ -1099,15 +1102,16 @@ export default function App() {
             const tab = v as AppTab;
             setActiveTab(tab);
             if (tab === 'physical' || tab === 'additive') setMode(tab);
+            addLog(`Tab switched to ${tab}`, 'info');
           }} className="w-full">
             <TabsList className="bg-zinc-100 border border-zinc-200 p-1 mb-6">
-              <TabsTrigger value="physical" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-xs px-6">
+              <TabsTrigger value="physical" className="data-active:bg-blue-600 data-active:text-white text-xs px-6">
                 <Cpu className="w-4 h-4 mr-2" /> Physical
               </TabsTrigger>
-              <TabsTrigger value="additive" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-xs px-6">
+              <TabsTrigger value="additive" className="data-active:bg-blue-600 data-active:text-white text-xs px-6">
                 <Waves className="w-4 h-4 mr-2" /> Additive
               </TabsTrigger>
-              <TabsTrigger value="docs" className="data-[state=active]:bg-zinc-700 data-[state=active]:text-white text-xs px-6">
+              <TabsTrigger value="docs" className="data-active:bg-zinc-700 data-active:text-white text-xs px-6">
                 <FileText className="w-4 h-4 mr-2" /> Guide
               </TabsTrigger>
             </TabsList>
