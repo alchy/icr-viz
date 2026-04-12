@@ -38,6 +38,13 @@ export interface Partial {
   beat_hz: number;
   phi: number;
   fit_quality: number;
+  damping_derived?: boolean;
+}
+
+export interface SpectralEQ {
+  freqs_hz: number[];
+  gains_db: number[];
+  stereo_width_factor?: number;
 }
 
 export interface AdditiveNoteParams {
@@ -50,9 +57,25 @@ export interface AdditiveNoteParams {
   rms_gain: number;
   n_strings?: number;
   rise_tau?: number;
+  stereo_width?: number;
   partials: Partial[];
   eq_biquads?: any[];
+  spectral_eq?: SpectralEQ;
 }
+
+// Reference key sets for validation (based on newest banks)
+export const ADDITIVE_NOTE_REQUIRED_KEYS = [
+  'midi', 'vel', 'f0_hz', 'B', 'phi_diff', 'attack_tau',
+  'A_noise', 'noise_centroid_hz', 'rms_gain', 'partials',
+] as const;
+
+export const ADDITIVE_NOTE_OPTIONAL_KEYS = [
+  'n_strings', 'rise_tau', 'stereo_width', 'eq_biquads', 'spectral_eq',
+] as const;
+
+export const PARTIAL_EXPECTED_KEYS = [
+  'k', 'f_hz', 'A0', 'tau1', 'tau2', 'a1', 'beat_hz', 'phi', 'fit_quality', 'damping_derived',
+] as const;
 
 // Legacy compat - simplified harmonic view
 export interface Harmonic {

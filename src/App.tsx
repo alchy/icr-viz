@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Activity, Anchor, Download, Upload, Filter, RefreshCw, Settings2,
@@ -67,6 +67,11 @@ export default function App() {
   const [projParamX, setProjParamX] = useState('f0_hz');
   const [projParamY, setProjParamY] = useState('T60_fund');
 
+  // Worker state
+  const workerRef = useRef<Worker | null>(null);
+  const analysisIdRef = useRef(0);
+  const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
+
   // Logging
   const addLog = useCallback((message: string, level: LogEntry['level'] = 'info') => {
     setLogs(prev => [{
@@ -75,6 +80,32 @@ export default function App() {
       message
     }, ...prev].slice(0, 200));
   }, []);
+
+  // Initialize Web Worker for heavy computations
+  useEffect(() => {
+    const worker = new Worker(
+      new URL('./workers/computation.worker.ts', import.meta.url),
+      { type: 'module' }
+    );
+    worker.onmessage = (e: MessageEvent) => {
+      const { id, type, tag, result, error } = e.data;
+      if (error) {
+        addLog(`Worker error [${type}]: ${error}`, 'error');
+        return;
+      }
+      switch (type) {
+        case 'analyzeDataset':
+          if (id === analysisIdRef.current) {
+            setAnalysisResults(result);
+            addLog(`Analysis complete: ${result.length} samples evaluated`, 'debug');
+          }
+          break;
+      }
+    };
+    workerRef.current = worker;
+    addLog('Computation worker initialized', 'debug');
+    return () => worker.terminate();
+  }, [addLog]);
 
   // Mode change: reset
   useEffect(() => {
@@ -191,9 +222,21 @@ export default function App() {
   // Computed values
   const allSamples = useMemo(() => loadedBanks.flatMap(b => b.samples), [loadedBanks]);
 
-  const analysisResults = useMemo(() => {
-    if (allSamples.length === 0) return [];
-    return analyzeDataset(allSamples, anchorRefs, threshold, mode, detectionMethod);
+  // Dispatch analysis to Web Worker (off main thread)
+  useEffect(() => {
+    if (allSamples.length === 0) { setAnalysisResults([]); return; }
+    const id = ++analysisIdRef.current;
+    workerRef.current?.postMessage({
+      id,
+      type: 'analyzeDataset',
+      payload: {
+        samples: allSamples,
+        anchors: anchorRefs,
+        threshold,
+        mode,
+        detection: detectionMethod,
+      },
+    });
   }, [allSamples, anchorRefs, threshold, mode, detectionMethod]);
 
   const selectedResult = useMemo(() =>
@@ -253,24 +296,36 @@ export default function App() {
   const handleAutoSelectAllBanks = async () => {
     if (availableBanks.length === 0) return;
     setIsProcessing(true);
-    setStatusMessage("Loading all banks...");
     setProgress(0);
 
-    const allBankSamples: Sample[] = [...allSamples];
     const pathsToLoad = availableBanks.filter(b => !selectedBankPaths.includes(b.path));
     const total = pathsToLoad.length;
+    setStatusMessage(`Fetching ${total} banks in parallel...`);
+    addLog(`Starting parallel fetch of ${total} banks`, 'info');
 
-    for (let i = 0; i < total; i++) {
-      const bankMeta = pathsToLoad[i];
-      setStatusMessage(`Loading ${bankMeta.name} (${i + 1}/${total})...`);
-      setProgress(Math.round(((i + 1) / total) * 80));
-      try {
+    // Parallel fetch — all network requests fire concurrently
+    const fetchResults = await Promise.allSettled(
+      pathsToLoad.map(async (bankMeta) => {
         const response = await fetch(bankMeta.download_url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
+        return { bankMeta, data };
+      })
+    );
+
+    setProgress(60);
+    setStatusMessage('Parsing fetched banks...');
+
+    const allBankSamples: Sample[] = [...allSamples];
+    let loadedCount = 0;
+    let failedCount = 0;
+
+    for (const result of fetchResults) {
+      if (result.status === 'fulfilled') {
+        const { bankMeta, data } = result.value;
         const { samples } = parseSoundbankJSON(data, bankMeta.path, bankMeta.name, mode);
         if (samples.length > 0) {
           allBankSamples.push(...samples);
-          // Also load the bank into the app state
           setSelectedBankPaths(prev => prev.includes(bankMeta.path) ? prev : [...prev, bankMeta.path]);
           setLoadedBanks(prev => prev.some(b => b.id === bankMeta.path) ? prev : [...prev, {
             id: bankMeta.path,
@@ -279,20 +334,23 @@ export default function App() {
             samples,
           }]);
           if (!activeBankPath) setActiveBankPath(bankMeta.path);
+          loadedCount++;
         }
-      } catch (err) {
-        addLog(`Failed to load ${bankMeta.name}: ${err}`, 'error');
+      } else {
+        failedCount++;
+        addLog(`Failed to fetch bank: ${result.reason}`, 'error');
       }
     }
 
+    setProgress(80);
     setStatusMessage("Physics-informed anchor selection across all banks...");
-    setProgress(90);
+
     const suggested = suggestAnchors(allBankSamples, mode);
     setAnchorRefs(suggested);
     setIsAutoMode(true);
     setIsCorrected(false);
     setProgress(100);
-    addLog(`All ${availableBanks.length} banks loaded. Auto-selected ${suggested.length} anchors from full dataset.`, 'success');
+    addLog(`Parallel load complete: ${loadedCount} banks loaded${failedCount > 0 ? `, ${failedCount} failed` : ''}. Auto-selected ${suggested.length} anchors.`, 'success');
     setIsProcessing(false);
   };
 

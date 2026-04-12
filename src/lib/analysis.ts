@@ -1,4 +1,4 @@
-import { Sample, Harmonic, Partial, AdditiveNoteParams, AnalysisResult, PhysicalParams, SynthesisMode, PHYSICAL_PARAM_KEYS, CorrectionConfig, AnchorRef, DetectionMethod } from '../types';
+import { Sample, Harmonic, Partial, AdditiveNoteParams, AnalysisResult, PhysicalParams, SynthesisMode, PHYSICAL_PARAM_KEYS, ADDITIVE_NOTE_REQUIRED_KEYS, ADDITIVE_NOTE_OPTIONAL_KEYS, PARTIAL_EXPECTED_KEYS, CorrectionConfig, AnchorRef, DetectionMethod } from '../types';
 import _ from 'lodash';
 
 // ============================================================
@@ -36,6 +36,63 @@ export function parseSoundbankJSON(
 
   debugLines.push(`Keys sample: ${noteKeys.slice(0, 5).join(', ')}${noteKeys.length > 5 ? '...' : ''}`);
 
+  // Key validation: check first note against expected schema
+  const firstNote = notes[noteKeys[0]];
+  if (firstNote && typeof firstNote === 'object') {
+    const actualKeys = new Set(Object.keys(firstNote));
+
+    if (mode === 'physical') {
+      const expectedKeys = new Set([...PHYSICAL_PARAM_KEYS, 'midi']);
+      const missing = [...expectedKeys].filter(k => !actualKeys.has(k));
+      const extra = [...actualKeys].filter(k => !expectedKeys.has(k));
+      if (missing.length > 0) {
+        debugLines.push(`KEY WARNING: missing physical keys: ${missing.join(', ')}`);
+      }
+      if (extra.length > 0) {
+        debugLines.push(`KEY INFO: extra keys ignored: ${extra.join(', ')}`);
+      }
+      if (missing.length === 0 && extra.length === 0) {
+        debugLines.push(`KEY OK: all ${expectedKeys.size} physical keys present`);
+      }
+    } else {
+      const requiredKeys = new Set<string>(ADDITIVE_NOTE_REQUIRED_KEYS);
+      const knownOptional = new Set<string>(ADDITIVE_NOTE_OPTIONAL_KEYS);
+      const allExpected = new Set([...requiredKeys, ...knownOptional, 'midi', 'vel']);
+
+      const missingRequired = [...requiredKeys].filter(k => !actualKeys.has(k));
+      const missingOptional = [...knownOptional].filter(k => !actualKeys.has(k));
+      const unknown = [...actualKeys].filter(k => !allExpected.has(k) && k !== 'partials');
+
+      if (missingRequired.length > 0) {
+        debugLines.push(`KEY ERROR: missing required additive keys: ${missingRequired.join(', ')} — bank may not load correctly`);
+      }
+      if (missingOptional.length > 0) {
+        debugLines.push(`KEY INFO: missing optional keys (defaults used): ${missingOptional.join(', ')}`);
+      }
+      if (unknown.length > 0) {
+        debugLines.push(`KEY INFO: unrecognized keys ignored: ${unknown.join(', ')}`);
+      }
+      if (missingRequired.length === 0) {
+        debugLines.push(`KEY OK: all required additive keys present`);
+      }
+
+      // Validate partial keys from first partial of first note
+      const firstPartials = firstNote.partials;
+      if (Array.isArray(firstPartials) && firstPartials.length > 0) {
+        const partialKeys = new Set(Object.keys(firstPartials[0]));
+        const expectedPartialKeys = new Set<string>(PARTIAL_EXPECTED_KEYS);
+        const missingPartial = [...expectedPartialKeys].filter(k => !partialKeys.has(k));
+        const extraPartial = [...partialKeys].filter(k => !expectedPartialKeys.has(k));
+        if (missingPartial.length > 0) {
+          debugLines.push(`PARTIAL KEY WARNING: missing: ${missingPartial.join(', ')}`);
+        }
+        if (extraPartial.length > 0) {
+          debugLines.push(`PARTIAL KEY INFO: extra keys: ${extraPartial.join(', ')}`);
+        }
+      }
+    }
+  }
+
   for (const key of noteKeys) {
     const note = notes[key];
     if (!note || typeof note !== 'object') continue;
@@ -62,36 +119,45 @@ export function parseSoundbankJSON(
           paramCount++;
         }
       }
-      if (paramCount > 0) {
-        sample.physical = physical as PhysicalParams;
-        samples.push(sample);
+      if (paramCount === 0) {
+        debugLines.push(`SKIP ${key}: no valid physical params (keys found: ${Object.keys(note).join(', ')})`);
+        continue;
       }
+      if (paramCount < PHYSICAL_PARAM_KEYS.length) {
+        debugLines.push(`WARN ${key}: only ${paramCount}/${PHYSICAL_PARAM_KEYS.length} physical params found`);
+      }
+      sample.physical = physical as PhysicalParams;
+      samples.push(sample);
     } else {
       // Additive: partials array -> convert to harmonics for analysis
       const partials = note.partials;
-      if (Array.isArray(partials) && partials.length > 0) {
-        sample.additive = {
-          f0_hz: note.f0_hz || 0,
-          B: note.B || 0,
-          phi_diff: note.phi_diff || 0,
-          attack_tau: note.attack_tau || 0,
-          A_noise: note.A_noise || 0,
-          noise_centroid_hz: note.noise_centroid_hz || 0,
-          rms_gain: note.rms_gain || 0,
-          n_strings: note.n_strings,
-          rise_tau: note.rise_tau,
-          partials: partials,
-          eq_biquads: note.eq_biquads,
-        };
-        // Convert partials to normalized harmonics for comparison
-        const maxA0 = Math.max(...partials.map((p: any) => Math.abs(p.A0 || 0)), 1e-9);
-        sample.harmonics = partials.map((p: any) => ({
-          index: p.k || 0,
-          amplitude: (p.A0 || 0) / maxA0,
-          phase: p.phi,
-        }));
-        samples.push(sample);
+      if (!Array.isArray(partials) || partials.length === 0) {
+        debugLines.push(`SKIP ${key}: no partials array`);
+        continue;
       }
+      sample.additive = {
+        f0_hz: note.f0_hz || 0,
+        B: note.B || 0,
+        phi_diff: note.phi_diff || 0,
+        attack_tau: note.attack_tau || 0,
+        A_noise: note.A_noise || 0,
+        noise_centroid_hz: note.noise_centroid_hz || 0,
+        rms_gain: note.rms_gain || 0,
+        n_strings: note.n_strings,
+        rise_tau: note.rise_tau,
+        stereo_width: note.stereo_width,
+        partials: partials,
+        eq_biquads: note.eq_biquads,
+        spectral_eq: note.spectral_eq,
+      };
+      // Convert partials to normalized harmonics for comparison
+      const maxA0 = Math.max(...partials.map((p: any) => Math.abs(p.A0 || 0)), 1e-9);
+      sample.harmonics = partials.map((p: any) => ({
+        index: p.k || 0,
+        amplitude: (p.A0 || 0) / maxA0,
+        phase: p.phi,
+      }));
+      samples.push(sample);
     }
   }
 
@@ -99,7 +165,7 @@ export function parseSoundbankJSON(
   if (midiNums.length > 0) {
     debugLines.push(`OK: ${samples.length} samples, MIDI ${midiNums[0]}-${midiNums[midiNums.length - 1]} (${midiNums.length} unique)`);
   } else {
-    debugLines.push(`WARNING: 0 samples parsed`);
+    debugLines.push(`WARNING: 0 samples parsed — bank keys may not match expected schema`);
   }
 
   if (mode === 'additive') {
@@ -631,29 +697,64 @@ export function analyzeDataset(
 
 function enrichWithStatistics(results: AnalysisResult[]): AnalysisResult[] {
   if (results.length < 3) return results;
+  const n = results.length;
   const deviations = results.map(r => r.deviation);
   const mean = _.mean(deviations);
   const stdDev = Math.sqrt(_.mean(deviations.map(d => (d - mean) ** 2)));
 
-  return results.map(r => ({
+  // Precompute isolation scores in single O(n²) pass with k-selection buffer
+  const k = Math.min(5, n - 1);
+  const isolationScores = new Float64Array(n);
+
+  // Pre-extract coordinates to avoid repeated property access
+  const midiNorm = new Float64Array(n);
+  const devs = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    midiNorm[i] = results[i].midi / 88;
+    devs[i] = results[i].deviation;
+  }
+
+  for (let i = 0; i < n; i++) {
+    // Maintain sorted k-nearest buffer (k is small, ~5, so linear insert is optimal)
+    const kDists = new Float64Array(k);
+    let kLen = 0;
+
+    for (let j = 0; j < n; j++) {
+      if (i === j) continue;
+      const dM = midiNorm[j] - midiNorm[i];
+      const dD = devs[j] - devs[i];
+      const dist = Math.sqrt(dM * dM + dD * dD);
+
+      if (kLen < k) {
+        // Buffer not full yet — insert in sorted position
+        let pos = kLen;
+        while (pos > 0 && kDists[pos - 1] > dist) {
+          kDists[pos] = kDists[pos - 1];
+          pos--;
+        }
+        kDists[pos] = dist;
+        kLen++;
+      } else if (dist < kDists[k - 1]) {
+        // Smaller than largest in buffer — replace and re-sort
+        let pos = k - 2;
+        while (pos >= 0 && kDists[pos] > dist) {
+          kDists[pos + 1] = kDists[pos];
+          pos--;
+        }
+        kDists[pos + 1] = dist;
+      }
+    }
+
+    let sum = 0;
+    for (let ki = 0; ki < kLen; ki++) sum += kDists[ki];
+    isolationScores[i] = kLen > 0 ? sum / kLen : 0;
+  }
+
+  return results.map((r, i) => ({
     ...r,
     zScore: stdDev > 0 ? (r.deviation - mean) / stdDev : 0,
-    isolationScore: computeIsolationScore(r, results),
+    isolationScore: isolationScores[i],
   }));
-}
-
-function computeIsolationScore(target: AnalysisResult, all: AnalysisResult[]): number {
-  const k = Math.min(5, all.length - 1);
-  if (k <= 0) return 0;
-  const distances = all
-    .filter(r => !(r.midi === target.midi && r.bankId === target.bankId))
-    .map(r => {
-      const dMidi = (r.midi - target.midi) / 88;
-      const dDev = r.deviation - target.deviation;
-      return Math.sqrt(dMidi ** 2 + dDev ** 2);
-    })
-    .sort((a, b) => a - b);
-  return _.mean(distances.slice(0, k));
 }
 
 // ============================================================
