@@ -19,21 +19,33 @@ import { DatasetOverview } from './components/DatasetOverview';
 import { ClusterProjection } from './components/ClusterProjection';
 import { TensionGraph } from './components/TensionGraph';
 import { SystemGuide } from './components/SystemGuide';
+import { Settings } from './components/Settings';
 import {
   Soundbank, Sample, AnalysisResult, SoundbankMetadata, AnchorRef,
-  SynthesisMode, LogEntry, CorrectionMethod, CorrectionConfig, ProjectedPoint, DetectionMethod
+  SynthesisMode, LogEntry, CorrectionMethod, CorrectionConfig, ProjectedPoint, DetectionMethod,
+  AppConfig, DEFAULT_APP_CONFIG
 } from './types';
 import { analyzeDataset, suggestAnchors, cleanDataset, applyCorrection, parseSoundbankJSON, generateCompleteBank } from './lib/analysis';
 import { projectSamples, getProjectionParams, ProjectionMethod, ProjectionConfig } from './lib/dimensionality';
 import _ from 'lodash';
 
-const GITHUB_BASE_URL = "https://api.github.com/repos/alchy/ICR/contents";
+type AppTab = 'physical' | 'additive' | 'docs' | 'settings';
 
-type AppTab = 'physical' | 'additive' | 'docs';
+function makeTimestamp(): string {
+  const now = new Date();
+  return [
+    String(now.getFullYear()).slice(2),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+    String(now.getHours()).padStart(2, '0'),
+    String(now.getMinutes()).padStart(2, '0'),
+  ].join('');
+}
 
 export default function App() {
   // Core state
   const [mode, setMode] = useState<SynthesisMode>('physical');
+  const [appConfig, setAppConfig] = useState<AppConfig>(DEFAULT_APP_CONFIG);
   const [activeTab, setActiveTab] = useState<AppTab>('physical');
   const [availableBanks, setAvailableBanks] = useState<SoundbankMetadata[]>([]);
   const [selectedBankPaths, setSelectedBankPaths] = useState<string[]>([]);
@@ -81,6 +93,19 @@ export default function App() {
     }, ...prev].slice(0, 200));
   }, []);
 
+  // Load config from server on mount
+  useEffect(() => {
+    fetch('/api/load-config')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.version) {
+          setAppConfig(data);
+          addLog('Configuration loaded from icr-config.json', 'debug');
+        }
+      })
+      .catch(() => { /* no config file yet, use defaults */ });
+  }, [addLog]);
+
   // Initialize Web Worker for heavy computations
   useEffect(() => {
     const worker = new Worker(
@@ -122,26 +147,51 @@ export default function App() {
     fetchBankList();
   }, [mode]);
 
-  // Fetch bank list from GitHub
+  // Fetch bank list from GitHub + optional local filesystem
   const fetchBankList = async () => {
     try {
       setLoading(true);
       setStatusMessage(`Loading ${mode} bank list...`);
-      const path = mode === 'additive' ? 'soundbanks-additive' : 'soundbanks-physical';
-      const response = await fetch(`${GITHUB_BASE_URL}/${path}`);
-      if (!response.ok) throw new Error(`GitHub API: ${response.status}`);
-      const data = await response.json();
+      const sourceConfig = mode === 'additive' ? appConfig.additiveSource : appConfig.physicalSource;
 
-      const banks = data
-        .filter((item: any) => item.name.endsWith('.json'))
-        .map((item: any) => ({
-          name: item.name.replace('.json', ''),
-          path: item.path,
-          download_url: item.download_url
-        }));
+      // Fetch from GitHub API
+      const banks: SoundbankMetadata[] = [];
+      try {
+        const response = await fetch(sourceConfig.githubUrl);
+        if (!response.ok) throw new Error(`GitHub API: ${response.status}`);
+        const data = await response.json();
+        const ghBanks = data
+          .filter((item: any) => item.name.endsWith('.json'))
+          .map((item: any) => ({
+            name: item.name.replace('.json', ''),
+            path: item.path,
+            download_url: item.download_url
+          }));
+        banks.push(...ghBanks);
+        addLog(`Found ${ghBanks.length} ${mode} banks in GitHub repo`, 'success');
+      } catch (err) {
+        addLog(`GitHub fetch failed: ${err}`, 'error');
+      }
+
+      // Fetch from local filesystem (if configured)
+      if (sourceConfig.filesystemPath) {
+        try {
+          const res = await fetch('/api/list-local', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ directory: sourceConfig.filesystemPath }),
+          });
+          const localBanks = await res.json();
+          if (Array.isArray(localBanks)) {
+            banks.push(...localBanks);
+            addLog(`Found ${localBanks.length} ${mode} banks on local filesystem`, 'success');
+          }
+        } catch (err) {
+          addLog(`Local filesystem fetch failed: ${err}`, 'error');
+        }
+      }
 
       setAvailableBanks(banks);
-      addLog(`Found ${banks.length} ${mode} banks in repo`, 'success');
 
       // Auto-select first bank
       if (banks.length > 0) {
@@ -177,9 +227,20 @@ export default function App() {
       setStatusMessage(`Loading ${bankMeta.name}...`);
       setProgress(10);
 
-      const response = await fetch(bankMeta.download_url);
+      let data: any;
+      if (bankMeta.download_url.startsWith('local:')) {
+        // Read from local filesystem via API
+        const res = await fetch('/api/read-local', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filePath: bankMeta.download_url.replace('local:', '') }),
+        });
+        data = await res.json();
+      } else {
+        const response = await fetch(bankMeta.download_url);
+        data = await response.json();
+      }
       setProgress(50);
-      const data = await response.json();
       setProgress(80);
 
       // Use new parser
@@ -423,7 +484,7 @@ export default function App() {
     addLog(`Correction [${correctionMethod}]: ${kept} kept, ${removed} removed (${allSamples.length} total)`, "success");
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (loadedBanks.length === 0) return;
     if (anchorRefs.length < 2) {
       addLog("Need at least 2 anchors for export", "error");
@@ -444,29 +505,37 @@ export default function App() {
       }
     );
 
-    const exportData = { metadata, notes };
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `merged-${mode}-cleaned.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    addLog(
-      `Exported: merged-${mode}-cleaned.json — ${stats.totalNotes} notes (${stats.fromOriginal} original, ${stats.interpolated} interpolated) → Downloads folder`,
-      'success'
-    );
+    const ts = makeTimestamp();
+    const filename = `merged-${mode}-cleaned-${ts}.json`;
+    const directory = `${appConfig.outputBaseDir}/${mode}`;
+    const content = JSON.stringify({ metadata, notes }, null, 2);
+
+    try {
+      const res = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ directory, filename, content }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        addLog(
+          `Exported: ${filename} — ${stats.totalNotes} notes (${stats.fromOriginal} original, ${stats.interpolated} interpolated) → ${result.path}`,
+          'success'
+        );
+      } else {
+        addLog(`Export failed: ${result.error}`, 'error');
+      }
+    } catch (err) {
+      addLog(`Export API error: ${err}`, 'error');
+    }
   };
 
-  const handleExportAnchors = () => {
+  const handleExportAnchors = async () => {
     if (anchorRefs.length === 0) {
       addLog("No anchors to export", "error");
       return;
     }
 
-    // Build anchor data with full sample params
     const anchorData = anchorRefs.map(ref => {
       const sample = allSamples.find(s => s.midi === ref.midi && s.bankId === ref.bankId && (ref.vel === undefined || s.vel === ref.vel));
       const bankName = loadedBanks.find(b => b.id === ref.bankId)?.name || ref.bankId;
@@ -491,26 +560,26 @@ export default function App() {
       anchors: anchorData,
     };
 
-    const now = new Date();
-    const ts = [
-      String(now.getFullYear()).slice(2),
-      String(now.getMonth() + 1).padStart(2, '0'),
-      String(now.getDate()).padStart(2, '0'),
-      String(now.getHours()).padStart(2, '0'),
-      String(now.getMinutes()).padStart(2, '0'),
-    ].join('');
-
+    const ts = makeTimestamp();
     const filename = `anchor-export-${ts}.json`;
-    const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    addLog(`Anchors exported: ${filename} (${anchorRefs.length} anchors) → saved to your browser's Downloads folder`, 'success');
+    const directory = `${appConfig.outputBaseDir}/${mode}`;
+    const content = JSON.stringify(exportObj, null, 2);
+
+    try {
+      const res = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ directory, filename, content }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        addLog(`Anchors exported: ${filename} (${anchorRefs.length} anchors) → ${result.path}`, 'success');
+      } else {
+        addLog(`Anchor export failed: ${result.error}`, 'error');
+      }
+    } catch (err) {
+      addLog(`Anchor export API error: ${err}`, 'error');
+    }
   };
 
   const handleImportAnchors = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1172,10 +1241,21 @@ export default function App() {
               <TabsTrigger value="docs" className="data-active:bg-zinc-700 data-active:text-white text-xs px-6">
                 <FileText className="w-4 h-4 mr-2" /> Guide
               </TabsTrigger>
+              <TabsTrigger value="settings" className="data-active:bg-zinc-700 data-active:text-white text-xs px-6">
+                <Settings2 className="w-4 h-4 mr-2" /> Settings
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="docs" className="mt-0">
               <SystemGuide />
+            </TabsContent>
+
+            <TabsContent value="settings" className="mt-0">
+              <Settings
+                config={appConfig}
+                onConfigChange={setAppConfig}
+                addLog={addLog}
+              />
             </TabsContent>
 
             {/* Both physical and additive share the same layout */}

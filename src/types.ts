@@ -165,3 +165,29 @@ export interface LogEntry {
   level: 'info' | 'debug' | 'error' | 'success';
   message: string;
 }
+
+// --- App Configuration ---
+export interface BankSourceConfig {
+  githubUrl: string;
+  filesystemPath: string;
+}
+
+export interface AppConfig {
+  physicalSource: BankSourceConfig;
+  additiveSource: BankSourceConfig;
+  outputBaseDir: string;
+  version: number;
+}
+
+export const DEFAULT_APP_CONFIG: AppConfig = {
+  physicalSource: {
+    githubUrl: 'https://api.github.com/repos/alchy/ICR/contents/soundbanks-physical',
+    filesystemPath: '',
+  },
+  additiveSource: {
+    githubUrl: 'https://api.github.com/repos/alchy/ICR/contents/soundbanks-additive',
+    filesystemPath: '',
+  },
+  outputBaseDir: './exports',
+  version: 1,
+};
