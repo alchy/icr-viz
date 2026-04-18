@@ -366,6 +366,8 @@ export function getIcrStatus(): Promise<import('@/types').IcrStatus> {
 
 export function launchIcr(body: {
   path?: string;
+  bank_id?: string;
+  core?: import('@/types').IcrEngineCore;
   extra_args?: string[];
 }): Promise<import('@/types').IcrStatus> {
   return sendJson('POST', '/api/icr/launch', body);

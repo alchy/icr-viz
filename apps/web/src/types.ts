@@ -417,6 +417,17 @@ export interface MidiPingResponse {
 
 export type IcrCore = 'active' | 'additive' | 'physical' | 'sampler' | 'sine' | 'iff';
 
+/**
+ * Engine core names as the icrgui CLI `--core` flag accepts them.
+ * Distinct from IcrCore (which includes the SysEx `active` target).
+ */
+export type IcrEngineCore =
+  | 'AdditiveCore'
+  | 'PhysicalCore'
+  | 'SamplerCore'
+  | 'SineCore'
+  | 'IFFSynthCore';
+
 export interface IcrStatus {
   running: boolean;
   pid: number | null;
