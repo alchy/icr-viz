@@ -1,0 +1,16 @@
+[project]
+name = "icr-viz-workspace"
+version = "0.1.0"
+description = "Monorepo workspace — meta package for dev installs"
+requires-python = ">=3.11"
+
+[tool.uv.sources]
+piano-core = { workspace = true }
+piano-web = { workspace = true }
+
+[tool.uv.workspace]
+members = ["packages/piano_core", "apps/api"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["packages/piano_core/tests", "apps/api/tests"]

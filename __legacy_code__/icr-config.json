@@ -1,0 +1,12 @@
+{
+  "physicalSource": {
+    "githubUrl": "https://api.github.com/repos/alchy/ICR/contents/soundbanks-physical",
+    "filesystemPath": ""
+  },
+  "additiveSource": {
+    "githubUrl": "https://api.github.com/repos/alchy/ICR/contents/soundbanks-additive",
+    "filesystemPath": ""
+  },
+  "outputBaseDir": "./exports",
+  "version": 1
+}

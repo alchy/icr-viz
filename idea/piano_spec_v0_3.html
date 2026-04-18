@@ -1,0 +1,1526 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Piano Spectral Editor — v0.3 · Kritická revize & operativní specifikace</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,700&family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+
+<style>
+:root{
+  --ink: #0d0e12;
+  --ink-2: #14161c;
+  --ink-3: #1c1f28;
+  --paper: #f5f1e8;
+  --paper-dim: #d9d3c3;
+  --muted: #8b8679;
+  --rule: #2a2d37;
+
+  --ab: #e8a33d;
+  --co: #52d1c2;
+  --vae: #d97fbb;
+  --anchor: #f2e05f;
+  --accent: #9fb4ff;
+  --warn: #ff8b6b;
+  --ok:   #7dd87a;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+
+html,body{background:var(--ink);color:var(--paper);font-family:'IBM Plex Sans',sans-serif;font-weight:300;line-height:1.65;-webkit-font-smoothing:antialiased}
+
+body{
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 0%, rgba(232,163,61,0.06), transparent 60%),
+    radial-gradient(ellipse 70% 50% at 100% 100%, rgba(217,127,187,0.05), transparent 60%),
+    var(--ink);
+  min-height:100vh;
+  padding-bottom:120px;
+}
+
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:0.22;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/></svg>");
+}
+
+.wrap{max-width:1180px;margin:0 auto;padding:64px 32px;position:relative;z-index:2}
+
+/* HERO */
+.hero{border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:72px 0 56px;margin-bottom:72px}
+.hero .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.25em;color:var(--warn);text-transform:uppercase;margin-bottom:24px;display:flex;align-items:center;gap:16px}
+.hero .eyebrow::before{content:"";width:32px;height:1px;background:var(--warn)}
+.hero h1{font-family:'Fraunces',serif;font-weight:300;font-size:clamp(44px,7vw,88px);line-height:0.95;letter-spacing:-0.03em;margin-bottom:24px}
+.hero h1 em{font-style:italic;font-weight:400;color:var(--co)}
+.hero h1 .warn{color:var(--warn);font-style:italic;font-weight:400}
+.hero .sub{font-family:'Fraunces',serif;font-weight:300;font-size:21px;color:var(--paper-dim);max-width:760px;line-height:1.45;margin-top:28px}
+.hero .meta{display:flex;gap:48px;margin-top:44px;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.15em}
+.hero .meta span strong{color:var(--paper);font-weight:500;display:block;margin-top:6px;letter-spacing:0.05em;text-transform:none;font-size:14px}
+
+/* SECTION */
+.section{margin-bottom:88px;scroll-margin-top:40px}
+.section-head{display:grid;grid-template-columns:120px 1fr;gap:32px;align-items:baseline;margin-bottom:40px;padding-bottom:20px;border-bottom:1px solid var(--rule)}
+.section-num{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--muted);letter-spacing:0.2em;padding-top:8px}
+.section-title{font-family:'Fraunces',serif;font-weight:400;font-size:clamp(30px,4vw,44px);line-height:1.05;letter-spacing:-0.02em}
+.section-title em{font-style:italic;color:var(--co)}
+.section-title .rose{color:var(--vae);font-style:italic}
+.section-lead{grid-column:2;font-family:'Fraunces',serif;font-weight:300;font-size:18px;color:var(--paper-dim);max-width:760px;line-height:1.5;margin-top:14px;font-style:italic}
+
+h3.sub-head{font-family:'Fraunces',serif;font-weight:400;font-style:italic;font-size:26px;color:var(--paper);margin:44px 0 20px;letter-spacing:-0.01em}
+h4{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin:28px 0 14px;padding-bottom:8px;border-bottom:1px dashed var(--rule)}
+
+/* TEXT */
+p{margin-bottom:16px;color:var(--paper-dim);max-width:800px}
+p strong{color:var(--paper);font-weight:500}
+code{font-family:'IBM Plex Mono',monospace;background:var(--ink-3);padding:2px 6px;border-radius:2px;font-size:0.88em;color:var(--ab)}
+
+/* CODE BLOCK */
+pre.code{background:var(--ink-2);border:1px solid var(--rule);border-left:3px solid var(--co);padding:20px 24px;margin:18px 0;overflow-x:auto;font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:1.55;color:var(--paper)}
+pre.code.api{border-left-color:var(--ab)}
+pre.code.warn{border-left-color:var(--warn)}
+pre.code .kw{color:var(--vae)}
+pre.code .str{color:var(--ok)}
+pre.code .num{color:var(--ab)}
+pre.code .cmt{color:var(--muted);font-style:italic}
+pre.code .fn{color:var(--co)}
+
+/* DIAGRAM */
+.diagram{background:var(--ink-2);border:1px solid var(--rule);border-radius:2px;padding:28px;margin:20px 0;position:relative;overflow:hidden}
+.diagram::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0.4}
+.diagram-label{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.2em;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.tag{padding:3px 10px;border:1px solid currentColor;border-radius:2px;font-size:10px}
+.tag-ab{color:var(--ab)}
+.tag-co{color:var(--co)}
+.tag-vae{color:var(--vae)}
+.tag-flow{color:var(--accent)}
+.tag-anchor{color:var(--anchor)}
+.tag-warn{color:var(--warn)}
+.tag-ok{color:var(--ok)}
+
+.mermaid{background:transparent!important;display:flex;justify-content:center;font-family:'IBM Plex Mono',monospace!important}
+.mermaid svg{max-width:100%;height:auto!important}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;background:var(--ink-2);border:1px solid var(--rule)}
+table th{background:var(--ink-3);font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);text-align:left;padding:14px 16px;border-bottom:1px solid var(--rule);font-weight:500}
+table td{padding:14px 16px;border-bottom:1px solid var(--rule);color:var(--paper-dim);vertical-align:top}
+table tr:last-child td{border-bottom:none}
+table td code{font-size:12px}
+table td strong{color:var(--paper)}
+
+/* CRITIQUE CARD */
+.critique{background:var(--ink-2);border:1px solid var(--rule);border-left:3px solid var(--warn);padding:24px 28px;margin-bottom:20px;position:relative}
+.critique .num{position:absolute;top:-14px;left:20px;background:var(--ink);padding:2px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--warn);border:1px solid var(--warn);letter-spacing:0.2em}
+.critique h4{margin-top:0;border:none;color:var(--paper);font-size:16px;font-family:'Fraunces',serif;font-style:italic;font-weight:400;text-transform:none;letter-spacing:0}
+.critique .problem{color:var(--paper-dim);font-size:14px;margin-top:8px}
+.critique .fix{color:var(--ok);font-size:14px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--rule)}
+.critique .fix::before{content:"→ ";color:var(--ok);font-family:'IBM Plex Mono',monospace;font-weight:500}
+
+/* NOTE BOXES */
+.note{font-family:'IBM Plex Sans',sans-serif;font-size:14px;color:var(--paper-dim);line-height:1.7;margin:18px 0;padding:18px 22px;border-left:2px solid var(--co);background:rgba(82,209,194,0.04)}
+.note.warn{border-color:var(--warn);background:rgba(255,139,107,0.05)}
+.note.ok{border-color:var(--ok);background:rgba(125,216,122,0.04)}
+.note strong{color:var(--paper);font-weight:500}
+
+/* OPERATION CARD */
+.op{background:var(--ink-2);border:1px solid var(--rule);padding:32px;margin:28px 0;position:relative}
+.op-title{display:flex;align-items:baseline;gap:16px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--rule)}
+.op-title .code-tag{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ab);padding:3px 10px;border:1px solid var(--ab);border-radius:2px;letter-spacing:0.1em}
+.op-title h3{font-family:'Fraunces',serif;font-weight:400;font-style:italic;font-size:26px;color:var(--paper)}
+
+/* TWO COL */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:18px 0}
+@media (max-width:900px){.two-col{grid-template-columns:1fr}}
+
+/* VIEWSTATE MOCKUP */
+.mock-panel{background:var(--ink-2);border:1px solid var(--rule);padding:24px;font-family:'IBM Plex Mono',monospace;font-size:12px;margin:20px 0}
+.mock-row{display:flex;align-items:center;gap:14px;padding:8px 0;border-bottom:1px dashed var(--rule)}
+.mock-row:last-child{border:none}
+.mock-label{color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;width:130px;flex-shrink:0;font-size:10px}
+.mock-value{color:var(--paper);flex:1}
+.mock-toggle{display:inline-block;padding:2px 8px;margin-right:4px;font-size:10px;border:1px solid var(--rule);border-radius:2px;color:var(--muted)}
+.mock-toggle.on{background:var(--co);color:var(--ink);border-color:var(--co)}
+.mock-toggle.off{color:var(--muted)}
+.mock-toggle.ab{background:var(--ab);color:var(--ink);border-color:var(--ab)}
+.mock-toggle.vae{background:var(--vae);color:var(--ink);border-color:var(--vae)}
+
+/* TOC */
+.toc{background:var(--ink-2);border:1px solid var(--rule);padding:28px 32px;margin-bottom:72px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:6px 28px}
+.toc a{color:var(--paper-dim);text-decoration:none;font-family:'IBM Plex Mono',monospace;font-size:12px;padding:7px 0;border-bottom:1px solid transparent;transition:all 0.2s;display:flex;align-items:baseline;gap:12px}
+.toc a:hover{color:var(--co);border-color:var(--co);padding-left:6px}
+.toc a .n{color:var(--muted)}
+
+.divider{height:1px;background:linear-gradient(90deg,transparent,var(--rule),transparent);margin:72px 0}
+
+.footer{border-top:1px solid var(--rule);padding-top:40px;margin-top:80px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:0.15em;text-transform:uppercase}
+
+.pill{display:inline-block;padding:3px 10px;border-radius:2px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;margin-right:6px;margin-bottom:4px}
+.pill-ab{background:rgba(232,163,61,0.15);color:var(--ab);border:1px solid rgba(232,163,61,0.3)}
+.pill-co{background:rgba(82,209,194,0.15);color:var(--co);border:1px solid rgba(82,209,194,0.3)}
+.pill-vae{background:rgba(217,127,187,0.15);color:var(--vae);border:1px solid rgba(217,127,187,0.3)}
+.pill-warn{background:rgba(255,139,107,0.15);color:var(--warn);border:1px solid rgba(255,139,107,0.3)}
+.pill-ok{background:rgba(125,216,122,0.15);color:var(--ok);border:1px solid rgba(125,216,122,0.3)}
+
+.delta{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--warn);margin-right:8px}
+.delta-add{color:var(--ok)}
+.delta-rm{color:var(--warn)}
+.delta-mv{color:var(--accent)}
+
+.formula{background:var(--ink-3);border:1px dashed var(--rule);padding:14px 20px;margin:12px 0;font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--anchor);text-align:center}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<!-- ================== HERO ================== -->
+<section class="hero">
+  <div class="eyebrow">Critical Revision · v0.3 · nahrazuje v0.2</div>
+  <h1>
+    <span class="warn">Revize</span><br>
+    &amp; <em>operativní</em><br>
+    specifikace.
+  </h1>
+  <p class="sub">
+    Kritická revize architektury v0.2 — identifikace osmi strukturálních problémů, redukce VAE z centra na volitelné rozšíření, zavedení Operator pattern, fyzikálního modelu a ViewState vrstvy. Obsahuje konkrétní implementace spline transferu, physical expansion a deviation analýzy.
+  </p>
+  <div class="meta">
+    <span>Nahrazuje<strong>v0.2 (2026-04-18)</strong></span>
+    <span>Přidává<strong>3 operace · ViewState · Physics</strong></span>
+    <span>Ruší<strong>VAE-centric dizajn</strong></span>
+    <span>Fází<strong>5 (místo 6)</strong></span>
+  </div>
+</section>
+
+<!-- ================== TOC ================== -->
+<nav class="toc">
+  <a href="#sec1"><span class="n">§ 01</span>Kritická revize v0.2</a>
+  <a href="#sec2"><span class="n">§ 02</span>Revidovaná architektura</a>
+  <a href="#sec3"><span class="n">§ 03</span>Operator pattern</a>
+  <a href="#sec4"><span class="n">§ 04</span>Kompaktní osnova fází</a>
+  <a href="#sec5"><span class="n">§ 05</span>Op. A — Spline Transfer</a>
+  <a href="#sec6"><span class="n">§ 06</span>Op. B — Physical Expand</a>
+  <a href="#sec7"><span class="n">§ 07</span>Op. C — Deviation</a>
+  <a href="#sec8"><span class="n">§ 08</span>ViewState &amp; UI kontrola</a>
+  <a href="#sec9"><span class="n">§ 09</span>Revidovaná API mapa</a>
+  <a href="#sec10"><span class="n">§ 10</span>Diff v0.2 → v0.3</a>
+</nav>
+
+<!-- ================== SECTION 1 : CRITIQUE ================== -->
+<section class="section" id="sec1">
+  <div class="section-head">
+    <div class="section-num">§ 01</div>
+    <div>
+      <h2 class="section-title">Kritická <em>revize</em> v0.2</h2>
+      <p class="section-lead">Osm strukturálních problémů v původní specifikaci — od přeceněného VAE přes chybějící fyzikální model až po promíchání prezentace a dat.</p>
+    </div>
+  </div>
+
+  <div class="critique">
+    <span class="num">01</span>
+    <h4>VAE je centralizovaný, ale prakticky není potřeba pro MVP</h4>
+    <div class="problem"><strong>Problém:</strong> v0.2 staví VAE jako jádro řešení (Fáze 3 z 5). Přitom trénink VAE na ~800 notách dává přetrénovaný model, KL-divergence se hůře ladí, a 95 % potřebných operací (transfer, interpolace, merge) zvládnou spliny a consensus statistika v CO prostoru bez neuronů.</div>
+    <div class="fix"><strong>Fix:</strong> VAE přesunut do <strong>Fáze 4 (volitelná)</strong>. MVP používá <code>SplineFitter</code> + <code>ConsensusOperator</code> v CO prostoru. VAE je later-stage eksperiment.</div>
+  </div>
+
+  <div class="critique">
+    <span class="num">02</span>
+    <h4>Chybí fyzikální model piána — klíčový nástroj pro expansion</h4>
+    <div class="problem"><strong>Problém:</strong> Piáno má <em>známou fyziku</em> — inharmonicita <code>f_k = k·f₀·√(1+Bk²)</code>, mocninný útlum <code>τ(k) ∝ k<sup>-α</sup></code>. v0.2 se tváří jako by data byla "black box" a všechno se muselo naučit z měření. Extraktory běžně detekují jen k=1..20, dalších 40 harmonik je potřeba dopočítat.</div>
+    <div class="fix"><strong>Fix:</strong> Nový modul <code>piano_physics.py</code> jako <strong>first-class citizen</strong>. Obsahuje: inharmonicity model, decay law fit, amplitude envelope. Použitelný jako operator <code>PhysicalExpandOperator</code>.</div>
+  </div>
+
+  <div class="critique">
+    <span class="num">03</span>
+    <h4>Chybí spline vrstva pro transfer mezi notami</h4>
+    <div class="problem"><strong>Problém:</strong> v0.2 mluví o "copy decay profile", ale dělá to jako prosté kopírování per-partial hodnot. Realita: tau1_coef(k) je <em>hladká funkce k</em> — cubic spline fit + evaluate je správná abstrakce. Zároveň <code>tau1_coef(midi)</code> přes klaviaturu je také spline.</div>
+    <div class="fix"><strong>Fix:</strong> Nový modul <code>spline_fitter.py</code> s <code>CubicSpline</code> / <code>BSpline</code> wrappery. Transfer operace = fit na source + evaluate na target. Funguje ve 2 dimenzích: <strong>po k</strong> (harmonika) a <strong>po MIDI</strong> (klaviatura).</div>
+  </div>
+
+  <div class="critique">
+    <span class="num">04</span>
+    <h4>Bank je mutable — žádné undo, žádná provenience</h4>
+    <div class="problem"><strong>Problém:</strong> v0.2 ukazuje <code>bank.notes[idx] = corrected_note</code> — přímý side-effect. Chybí edit history, nelze udělat undo, nelze sdílet intermediate stavy, nelze auditovat "kdo co změnil".</div>
+    <div class="fix"><strong>Fix:</strong> <strong>Immutable Bank</strong>. Operátor vrací <code>(Bank_new, Edit_record)</code>. Bank má <code>parent_id</code> a <code>edits: List[Edit]</code>. Undo = vrať <code>parent</code>. Každá nota má <code>provenance</code> (od kterého extraktoru / operace pochází).</div>
+  </div>
+
+  <div class="critique">
+    <span class="num">05</span>
+    <h4>"VAE" je používáno současně jako zdroj dat i model</h4>
+    <div class="problem"><strong>Problém:</strong> v0.2 tabulka extraktorů obsahuje "VAE → Latent Z". VAE není extraktor — je to learned model natrénovaný <em>nad</em> extraktory. Konceptuální match s Partialis/DDSP je mylný.</div>
+    <div class="fix"><strong>Fix:</strong> Extraktory jsou jen <strong>Partialis, DDSP, Custom</strong>. VAE je <strong>nástroj</strong> (v Operatoru <code>VAESmoothOperator</code>). Source string už neobsahuje "VAE".</div>
+  </div>
+
+  <div class="critique">
+    <span class="num">06</span>
+    <h4>Prezentace a data jsou promíchané</h4>
+    <div class="problem"><strong>Problém:</strong> v0.2 frontend má "Compare Mode", "Parameter Selector" atd. jako ad-hoc UI prvky. Žádný formální model <em>co se zobrazuje</em>. Nelze uložit pohled, sdílet ho, ani testovat.</div>
+    <div class="fix"><strong>Fix:</strong> <code>ViewState</code> jako formální objekt — visible sources, parameter toggles, k-range, filter thresholds, overlay layers, comparison mode. Serializovatelný do JSON → sdílení, presety, undo/redo pohledu.</div>
+  </div>
+
+  <div class="critique">
+    <span class="num">07</span>
+    <h4>API je per-note, chybí batch a streaming</h4>
+    <div class="problem"><strong>Problém:</strong> UC3 v0.2 dělá <code>GET /latent/note</code> 7× a <code>POST /reconstruct</code> 7× pro vyplnění velocity. Pro 1000 notů = 2000 requestů. Pro spline transfer na celé oktávě = 12 requestů.</div>
+    <div class="fix"><strong>Fix:</strong> Batch endpointy <code>POST /api/ops/batch</code> přijímající seznam operací. Velké operace přes WebSocket <code>/ws/ops</code> s progress stream. Caching CO reprezentací (Redis/in-memory) — normalizace se provádí jen při změně.</div>
+  </div>
+
+  <div class="critique">
+    <span class="num">08</span>
+    <h4>Anchor weight 1-9 je arbitrární ordinál</h4>
+    <div class="problem"><strong>Problém:</strong> "weight 1-9" je neurčité — je to Likert škála? logaritmická? Jak ji VAE použije v loss? Navíc chybí <em>typ</em> anchoru — je to naměřený bod, konsenzus, nebo ruční korekce?</div>
+    <div class="fix"><strong>Fix:</strong> <code>Anchor.weight ∈ [0, 1]</code> (spojité) + <code>Anchor.kind ∈ {"measured", "consensus", "manual", "physical"}</code>. Weight se interpretuje jako inverzní variance: <code>σ² = (1 - weight)²</code> pro Mahalanobis loss.</div>
+  </div>
+
+  <div class="note warn">
+    <strong>Nechávám beze změny:</strong> AB ↔ CO reverzibilita, f0_hz jako invariant, per-partial struktura, MIDI/velocity rozsahy. Tyto jsou správně.
+  </div>
+</section>
+
+<!-- ================== SECTION 2 : REVISED ARCHITECTURE ================== -->
+<section class="section" id="sec2">
+  <div class="section-head">
+    <div class="section-num">§ 02</div>
+    <div>
+      <h2 class="section-title">Revidovaná <em>architektura</em></h2>
+      <p class="section-lead">Osm vrstev, každá izolovaná, testovatelná, s jasnou odpovědností. VAE a Frontend jsou odpojitelné.</p>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 2.1 · Vrstevnatá architektura v0.3</span><span class="tag tag-flow">layers</span></div>
+<pre class="mermaid">
+flowchart TB
+    L0["<b>L0 · Raw I/O</b><br/>ICR JSON · Partialis · DDSP · Custom"]
+    L1["<b>L1 · Core Model (AB)</b><br/>Partial · Note · Bank (immutable)<br/>+ provenance + edit history"]
+    L2["<b>L2 · Normalization (CO)</b><br/>to_coefficients / to_note<br/>+ cache key per (midi, vel, source)"]
+    L3["<b>L3 · Operators</b><br/>SplineTransfer · PhysicalExpand · Consensus<br/>AnchorInterpolate · VAESmooth (opt.)"]
+    L4["<b>L4 · Aggregation</b><br/>multi-source compare · deviation metrics<br/>confidence scoring · anomaly detect"]
+    L5["<b>L5 · VAE (optional)</b><br/>encoder · decoder · latent z<br/>volitelně zapnutelné, ne nutné pro MVP"]
+    L6["<b>L6 · REST/WS API</b><br/>FastAPI · batch ops · progress stream"]
+    L7["<b>L7 · ViewState + UI</b><br/>visible sources · parameter toggles<br/>k-range · overlays · compare modes"]
+
+    L0 --> L1 --> L2 --> L3
+    L3 --> L4
+    L4 -. volitelně .-> L5
+    L3 --> L6
+    L4 --> L6
+    L5 -. volitelně .-> L6
+    L6 --> L7
+
+    classDef io fill:#1c1f28,stroke:#8b8679,color:#f5f1e8
+    classDef core fill:#1c1f28,stroke:#e8a33d,color:#e8a33d
+    classDef coef fill:#1c1f28,stroke:#52d1c2,color:#52d1c2
+    classDef op fill:#1c1f28,stroke:#9fb4ff,color:#9fb4ff
+    classDef vae fill:#1c1f28,stroke:#d97fbb,color:#d97fbb,stroke-dasharray: 5 5
+    classDef api fill:#1c1f28,stroke:#f2e05f,color:#f2e05f
+    classDef ui fill:#1c1f28,stroke:#7dd87a,color:#7dd87a
+    class L0 io
+    class L1 core
+    class L2 coef
+    class L3,L4 op
+    class L5 vae
+    class L6 api
+    class L7 ui
+</pre>
+  </div>
+
+  <div class="note">
+    <strong>Klíčový posun:</strong> Operátory jsou <em>samostatnou vrstvou</em> (L3) a jsou <em>technologicky neutrální</em> — Spline používá SciPy, Physics používá NumPy, VAE používá PyTorch. Jádro (L1-L2) nemá žádné ML dependence.
+  </div>
+
+  <h3 class="sub-head">Immutable Bank s edit history</h3>
+
+<pre class="code"><span class="cmt"># piano_core/models.py — revidováno</span>
+
+<span class="kw">@dataclass(frozen=True)</span>
+<span class="kw">class</span> <span class="fn">Note</span>:
+    midi: <span class="kw">int</span>
+    velocity: <span class="kw">int</span>
+    f0_hz: <span class="kw">float</span>
+    B: <span class="kw">float</span>
+    partials: Tuple[Partial, ...]       <span class="cmt"># immutable tuple, ne list</span>
+    source: <span class="kw">str</span>                    <span class="cmt"># "Partialis" | "DDSP" | "Custom"</span>
+    provenance: Provenance              <span class="cmt"># NEW: odkud pochází</span>
+    id: <span class="kw">str</span>
+
+<span class="kw">@dataclass(frozen=True)</span>
+<span class="kw">class</span> <span class="fn">Provenance</span>:
+    <span class="cmt">"""Řetězec operací, které notu vytvořily."""</span>
+    origin_source: <span class="kw">str</span>              <span class="cmt"># původní extraktor</span>
+    edits: Tuple[EditRecord, ...]       <span class="cmt"># chronologicky</span>
+    fit_quality_min: <span class="kw">float</span>          <span class="cmt"># nejhorší partial v notě</span>
+
+<span class="kw">@dataclass(frozen=True)</span>
+<span class="kw">class</span> <span class="fn">EditRecord</span>:
+    operator: <span class="kw">str</span>                   <span class="cmt"># "SplineTransfer" | "PhysicalExpand" | ...</span>
+    params: <span class="kw">dict</span>                     <span class="cmt"># args operatoru</span>
+    timestamp: <span class="kw">str</span>
+    source_note_id: Optional[<span class="kw">str</span>]    <span class="cmt"># pro transfer</span>
+
+<span class="kw">@dataclass(frozen=True)</span>
+<span class="kw">class</span> <span class="fn">Bank</span>:
+    id: <span class="kw">str</span>
+    parent_id: Optional[<span class="kw">str</span>]         <span class="cmt"># NEW: pro undo</span>
+    notes: Tuple[Note, ...]
+    anchors: Tuple[Anchor, ...]
+    metadata: <span class="kw">dict</span>
+    
+    <span class="kw">def</span> <span class="fn">with_updated_note</span>(<span class="kw">self</span>, note: Note) -> <span class="str">"Bank"</span>:
+        <span class="cmt">"""Vrátí novou Bank s nahrazenou notou (+ parent_id)."""</span>
+        new_notes = <span class="kw">tuple</span>(n <span class="kw">if</span> n.id != note.id <span class="kw">else</span> note <span class="kw">for</span> n <span class="kw">in</span> <span class="kw">self</span>.notes)
+        <span class="kw">return</span> replace(<span class="kw">self</span>, id=new_id(), parent_id=<span class="kw">self</span>.id, notes=new_notes)
+</pre>
+</section>
+
+<!-- ================== SECTION 3 : OPERATOR PATTERN ================== -->
+<section class="section" id="sec3">
+  <div class="section-head">
+    <div class="section-num">§ 03</div>
+    <div>
+      <h2 class="section-title">Operator <em>pattern</em></h2>
+      <p class="section-lead">Všechny úpravy notů mají jednotné rozhraní: <code>apply / preview / validate / record</code>. Rozhraní je stabilní, implementace různá.</p>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 3.1 · Operator interface</span><span class="tag tag-flow">pattern</span></div>
+<pre class="mermaid">
+classDiagram
+    direction LR
+    class Operator {
+        &lt;&lt;abstract&gt;&gt;
+        +name: str
+        +apply(bank: Bank, **params) Tuple~Bank, EditRecord~
+        +preview(bank: Bank, **params) PreviewResult
+        +validate(bank: Bank, **params) ValidationResult
+        +undo(bank: Bank) Bank
+    }
+    class SplineTransferOperator {
+        +source_note_id: str
+        +target_note_ids: List~str~
+        +parameter: str
+        +method: str
+        +fit_quality_threshold: float
+    }
+    class PhysicalExpandOperator {
+        +note_id: str
+        +target_k_max: int
+        +inharmonicity_B: float
+        +estimate_decay_from: str
+    }
+    class ConsensusOperator {
+        +bank_ids: List~str~
+        +weights: List~float~
+        +strategy: str
+    }
+    class AnchorInterpolateOperator {
+        +target_note_ids: List~str~
+        +k_nearest: int
+    }
+    class VAESmoothOperator {
+        +bank_id: str
+        +beta: float
+    }
+    Operator &lt;|-- SplineTransferOperator
+    Operator &lt;|-- PhysicalExpandOperator
+    Operator &lt;|-- ConsensusOperator
+    Operator &lt;|-- AnchorInterpolateOperator
+    Operator &lt;|-- VAESmoothOperator
+</pre>
+  </div>
+
+<pre class="code"><span class="cmt"># piano_core/operators/base.py</span>
+
+<span class="kw">class</span> <span class="fn">Operator</span>(ABC):
+    <span class="cmt">"""Základní rozhraní všech editačních operací."""</span>
+    
+    name: <span class="kw">str</span>
+    
+    <span class="kw">@abstractmethod</span>
+    <span class="kw">def</span> <span class="fn">apply</span>(<span class="kw">self</span>, bank: Bank, **params) -> Tuple[Bank, EditRecord]:
+        <span class="cmt">"""Vrátí nový Bank + záznam o úpravě. Nikdy nemodifikuje vstup."""</span>
+    
+    <span class="kw">def</span> <span class="fn">preview</span>(<span class="kw">self</span>, bank: Bank, **params) -> PreviewResult:
+        <span class="cmt">"""Lehká verze pro UI — bez commit, s diagnostikou."""</span>
+        new_bank, _ = <span class="kw">self</span>.apply(bank, **params)
+        <span class="kw">return</span> PreviewResult(
+            changed_note_ids=diff_notes(bank, new_bank),
+            coef_diffs=compute_coef_diffs(bank, new_bank),
+            warnings=<span class="kw">self</span>.validate(bank, **params).warnings
+        )
+    
+    <span class="kw">def</span> <span class="fn">validate</span>(<span class="kw">self</span>, bank: Bank, **params) -> ValidationResult:
+        <span class="cmt">"""Pre-flight check. Vrací errors + warnings."""</span>
+        <span class="kw">return</span> ValidationResult(errors=[], warnings=[])
+    
+    <span class="kw">def</span> <span class="fn">undo</span>(<span class="kw">self</span>, bank: Bank) -> Bank:
+        <span class="cmt">"""Default: vrátí parent. Operator může overridnout pro smart undo."""</span>
+        <span class="kw">return</span> registry.get_bank(bank.parent_id)
+</pre>
+</section>
+
+<!-- ================== SECTION 4 : PROJECT OUTLINE ================== -->
+<section class="section" id="sec4">
+  <div class="section-head">
+    <div class="section-num">§ 04</div>
+    <div>
+      <h2 class="section-title">Kompaktní <em>osnova</em> fází</h2>
+      <p class="section-lead">Pět fází místo šesti. Každá dodává samostatně použitelnou funkcionalitu (CLI tool i API).</p>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th style="width:80px">Fáze</th><th style="width:180px">Cíl</th><th>Deliverables</th><th style="width:120px">Validace</th><th style="width:90px">Týdny</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>F1</strong><br><span class="pill pill-ab">core</span></td>
+        <td><strong>Core + AB↔CO</strong><br>Immutable datové třídy</td>
+        <td><code>models.py</code>, <code>io.py</code>, <code>spline_fitter.py</code>, <code>piano_physics.py</code>. Reverzibilita, ICR import/export, fyzikální formule jako utility.</td>
+        <td>Round-trip test 1e-6 · 100% unit coverage</td>
+        <td>W1-2</td>
+      </tr>
+      <tr>
+        <td><strong>F2</strong><br><span class="pill pill-co">ops</span></td>
+        <td><strong>Operators</strong><br>Spline / Physical / Consensus / Anchor</td>
+        <td><code>operators/*.py</code> — 4 operátory s apply/preview/validate/undo. <code>Edit</code> a <code>Provenance</code> tracking. Batch wrapper.</td>
+        <td>Integration tests per operator · provenance invariants</td>
+        <td>W3-4</td>
+      </tr>
+      <tr>
+        <td><strong>F3</strong><br><span class="pill pill-ab">api</span></td>
+        <td><strong>REST API + ViewState</strong><br>FastAPI + frontend MVP</td>
+        <td><code>api/*.py</code> s batch endpointy, WebSocket progress stream. ViewState serializace. Minimální React UI s 2D scatter + controls.</td>
+        <td>API contract tests · E2E smoke test</td>
+        <td>W5-6</td>
+      </tr>
+      <tr>
+        <td><strong>F4</strong><br><span class="pill pill-vae">vae</span></td>
+        <td><strong>VAE (volitelné)</strong><br>Latent smooth + anchor corrective loss</td>
+        <td><code>vae/encoder.py</code>, <code>decoder.py</code>, <code>train.py</code>. <code>VAESmoothOperator</code>. Latent viewer v UI.</td>
+        <td>Reconstruction loss &lt; 0.01 na test set</td>
+        <td>W7-10</td>
+      </tr>
+      <tr>
+        <td><strong>F5</strong><br><span class="pill pill-ok">prod</span></td>
+        <td><strong>Produkce</strong><br>Storage, auth, polish</td>
+        <td>PostgreSQL, Redis cache, auth, Docker compose. Audit log. Export formats.</td>
+        <td>Load tests · security review</td>
+        <td>W11-12</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="note ok">
+    <strong>Princip nezávislosti:</strong> Po F1 existuje použitelný Python modul (CLI tooling). Po F2 plný editor jako knihovna. Po F3 plnohodnotný web editor. F4 a F5 přidávají, neblokují.
+  </div>
+</section>
+
+<!-- ================== SECTION 5 : OPERATION A — SPLINE TRANSFER ================== -->
+<section class="section" id="sec5">
+  <div class="section-head">
+    <div class="section-num">§ 05</div>
+    <div>
+      <h2 class="section-title">Operace A — <em>Spline Transfer</em></h2>
+      <p class="section-lead">Přenos hladkého průběhu parametru (typicky τ₁, τ₂, A₀) z jedné noty na jednu nebo více jiných. Funguje v CO prostoru přes cubic spline fit.</p>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="op-title">
+      <span class="code-tag">ALG · 5.1</span>
+      <h3>Algoritmus</h3>
+    </div>
+
+    <p><strong>Vstup:</strong> Source nota A (well-extracted), target nota B (stejné nebo jiné MIDI/velocity), parametr <code>tau1</code>, metoda <code>cubic_natural</code>.</p>
+
+    <p><strong>Princip:</strong> Profil <code>tau1_coef(k)</code> je v CO prostoru <em>invariantní vůči MIDI a velocity</em> (dle tvrzení spec). Fitnu spline <code>S(k)</code> na source's high-quality partials a vyhodnotím ho na target's k-indexech. Denormalizace se provede přes target's <code>tau1_fund</code>.</p>
+
+    <div class="formula">
+      S(k) = CubicSpline((k<sub>i</sub>, τ₁<sub>coef</sub>[i]) | fit_quality<sub>i</sub> ≥ θ)<br>
+      τ₁<sup>target</sup>(k) = S(k) · τ₁<sub>fund</sub><sup>target</sup>
+    </div>
+
+    <h4>Pseudo-kód</h4>
+<pre class="code"><span class="cmt"># piano_core/operators/spline_transfer.py</span>
+<span class="kw">from</span> scipy.interpolate <span class="kw">import</span> CubicSpline, UnivariateSpline
+
+<span class="kw">class</span> <span class="fn">SplineTransferOperator</span>(Operator):
+    name = <span class="str">"SplineTransfer"</span>
+    
+    <span class="kw">def</span> <span class="fn">apply</span>(
+        <span class="kw">self</span>, bank: Bank,
+        source_note_id: <span class="kw">str</span>,
+        target_note_ids: List[<span class="kw">str</span>],
+        parameter: <span class="kw">str</span> = <span class="str">"tau1"</span>,           <span class="cmt"># tau1 | tau2 | A0 | a1 | beat_hz</span>
+        method: <span class="kw">str</span> = <span class="str">"cubic_natural"</span>,     <span class="cmt"># cubic_natural | cubic_clamped | bspline_smooth</span>
+        smoothing: <span class="kw">float</span> = 0.0,              <span class="cmt"># 0 = interpolate; &gt;0 = smooth B-spline</span>
+        fit_quality_threshold: <span class="kw">float</span> = 0.7,
+        k_range: Tuple[<span class="kw">int</span>, <span class="kw">int</span>] = (1, 60),
+        preserve_fundamental: <span class="kw">bool</span> = <span class="kw">True</span>,   <span class="cmt"># nikdy neměnit k=1</span>
+    ) -> Tuple[Bank, EditRecord]:
+        
+        <span class="cmt"># 1. Source → CO</span>
+        src = bank.get_note(source_note_id)
+        src_coef = src.to_coefficients()
+        param_coef_field = <span class="str">f"{parameter}_coef"</span>
+        
+        <span class="cmt"># 2. Sber body (k, coef) kde fit_quality ≥ θ</span>
+        points = [(p.k, getattr(p, param_coef_field))
+                  <span class="kw">for</span> p <span class="kw">in</span> src_coef.partials
+                  <span class="kw">if</span> p.fit_quality >= fit_quality_threshold
+                  <span class="kw">and</span> k_range[0] <= p.k <= k_range[1]]
+        
+        <span class="kw">if</span> <span class="kw">len</span>(points) < 4:
+            <span class="kw">raise</span> ValidationError(<span class="str">"Need ≥4 high-quality partials to fit spline"</span>)
+        
+        <span class="cmt"># 3. Fit spline</span>
+        ks, ys = <span class="kw">zip</span>(*points)
+        <span class="kw">if</span> method == <span class="str">"cubic_natural"</span>:
+            spline = CubicSpline(ks, ys, bc_type=<span class="str">'natural'</span>)
+        <span class="kw">elif</span> method == <span class="str">"bspline_smooth"</span>:
+            spline = UnivariateSpline(ks, ys, s=smoothing, k=3)
+        
+        <span class="cmt"># 4. Apply per target note (v CO prostoru)</span>
+        new_bank = bank
+        <span class="kw">for</span> tid <span class="kw">in</span> target_note_ids:
+            tgt = new_bank.get_note(tid)
+            tgt_coef = tgt.to_coefficients()
+            
+            new_partials = []
+            <span class="kw">for</span> p <span class="kw">in</span> tgt_coef.partials:
+                <span class="kw">if</span> preserve_fundamental <span class="kw">and</span> p.k == 1:
+                    new_partials.append(p)
+                    <span class="kw">continue</span>
+                <span class="kw">if</span> k_range[0] <= p.k <= k_range[1]:
+                    new_val = <span class="kw">float</span>(spline(p.k))
+                    <span class="cmt"># clamp na rozumný interval (např. [0.01, 2.0] pro τ_coef)</span>
+                    new_val = clamp(new_val, *COEF_BOUNDS[parameter])
+                    p = replace(p, **{param_coef_field: new_val})
+                new_partials.append(p)
+            
+            new_note = replace(tgt_coef, partials=<span class="kw">tuple</span>(new_partials)).to_note()
+            <span class="cmt"># Append provenance</span>
+            new_note = append_edit(new_note, EditRecord(
+                operator=<span class="str">"SplineTransfer"</span>,
+                params={<span class="str">"source"</span>: source_note_id, <span class="str">"parameter"</span>: parameter, ...},
+                source_note_id=source_note_id
+            ))
+            new_bank = new_bank.with_updated_note(new_note)
+        
+        <span class="kw">return</span> new_bank, EditRecord(...)
+</pre>
+  </div>
+
+  <div class="op">
+    <div class="op-title">
+      <span class="code-tag">API · 5.2</span>
+      <h3>API volání</h3>
+    </div>
+
+<pre class="code api"><span class="kw">POST</span> /api/ops/spline-transfer
+Content-Type: application/json
+
+{
+  <span class="str">"bank_id"</span>: <span class="str">"bank_001"</span>,
+  <span class="str">"source_note_id"</span>: <span class="str">"m060_vel5_partialis"</span>,
+  <span class="str">"target_note_ids"</span>: [
+    <span class="str">"m060_vel0"</span>, <span class="str">"m060_vel1"</span>, <span class="str">"m060_vel2"</span>, <span class="str">"m060_vel3"</span>,
+    <span class="str">"m060_vel4"</span>,                <span class="str">"m060_vel6"</span>, <span class="str">"m060_vel7"</span>
+  ],
+  <span class="str">"parameter"</span>: <span class="str">"tau1"</span>,
+  <span class="str">"method"</span>: <span class="str">"cubic_natural"</span>,
+  <span class="str">"fit_quality_threshold"</span>: <span class="num">0.7</span>,
+  <span class="str">"k_range"</span>: [<span class="num">1</span>, <span class="num">60</span>],
+  <span class="str">"preserve_fundamental"</span>: <span class="kw">true</span>,
+  <span class="str">"commit"</span>: <span class="kw">false</span>   <span class="cmt">// false = preview only, true = commit edit</span>
+}</pre>
+
+<pre class="code"><span class="cmt">// Response 200 (preview)</span>
+{
+  <span class="str">"operation_id"</span>: <span class="str">"op_7f3a2"</span>,
+  <span class="str">"changed_note_ids"</span>: [<span class="str">"m060_vel0"</span>, ... , <span class="str">"m060_vel7"</span>],
+  <span class="str">"spline_fit"</span>: {
+    <span class="str">"method"</span>: <span class="str">"cubic_natural"</span>,
+    <span class="str">"points_used"</span>: <span class="num">42</span>,
+    <span class="str">"points_rejected"</span>: <span class="num">18</span>,       <span class="cmt">// filtered by fit_quality</span>
+    <span class="str">"rmse_residual"</span>: <span class="num">0.0031</span>
+  },
+  <span class="str">"coef_diffs"</span>: {
+    <span class="str">"m060_vel0"</span>: {
+      <span class="str">"tau1_coef_delta_max"</span>: <span class="num">0.142</span>,   <span class="cmt">// max |Δ| per partial</span>
+      <span class="str">"tau1_coef_delta_rmse"</span>: <span class="num">0.048</span>,
+      <span class="str">"most_affected_k"</span>: [<span class="num">12</span>, <span class="num">27</span>, <span class="num">41</span>]
+    }, ...
+  },
+  <span class="str">"warnings"</span>: [
+    {<span class="str">"level"</span>: <span class="str">"info"</span>, <span class="str">"msg"</span>: <span class="str">"k=58,59,60 extrapolated beyond source data"</span>}
+  ]
+}</pre>
+  </div>
+
+  <div class="note">
+    <strong>Varianta po MIDI (klaviatura):</strong> Operátor podporuje i druhou dimenzi — místo <code>spline(k)</code> per-partial vede k <code>spline(midi)</code> per-partial. Použití: "vyhladit τ₁ pro k=5 napříč celou oktávou C4-C5". Param <code>axis: "k" | "midi"</code>.
+  </div>
+</section>
+
+<!-- ================== SECTION 6 : OPERATION B — PHYSICAL EXPAND ================== -->
+<section class="section" id="sec6">
+  <div class="section-head">
+    <div class="section-num">§ 06</div>
+    <div>
+      <h2 class="section-title">Operace B — <em>Physical Expand</em></h2>
+      <p class="section-lead">Extrapolace chybějících harmonik dle fyzikálního modelu piána. Používá inharmonicitu, mocninný útlum a amplitudovou obálku.</p>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="op-title">
+      <span class="code-tag">ALG · 6.1</span>
+      <h3>Fyzikální vzorce</h3>
+    </div>
+
+    <p><strong>Motivace:</strong> Extraktory typicky detekují partials k=1..20 dobře. Pro k>20 klesá fit_quality rapidně (překrytí s noise, úzká decay). Fyzika piána je známá a umí doplnit zbytek deterministicky.</p>
+
+    <h4>Vzorce</h4>
+    <div class="formula">
+      <strong>Inharmonicita:</strong>&nbsp;&nbsp; f<sub>k</sub> = k · f₀ · √(1 + B · k²)
+    </div>
+    <div class="formula">
+      <strong>Decay law:</strong>&nbsp;&nbsp; τ₁(k) = τ₁<sub>fund</sub> · k<sup>-α</sup>
+    </div>
+    <div class="formula">
+      <strong>Amplitude:</strong>&nbsp;&nbsp; A₀(k) = A₀<sub>fund</sub> · k<sup>-β</sup>
+    </div>
+    <div class="formula">
+      <strong>τ₂ ratio:</strong>&nbsp;&nbsp; τ₂(k) / τ₁(k) ≈ γ&nbsp;&nbsp;<em>(γ ≈ 9-12 pro piáno)</em>
+    </div>
+
+    <p>Parametry <code>B</code>, <code>α</code>, <code>β</code>, <code>γ</code> se <strong>odhadnou z dobře detekovaných partialů</strong> (log-log regrese), případně se použijí prior hodnoty z katalogu nástroje.</p>
+
+    <h4>Algoritmus</h4>
+<pre class="code"><span class="cmt"># piano_core/operators/physical_expand.py</span>
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+
+<span class="kw">class</span> <span class="fn">PhysicalExpandOperator</span>(Operator):
+    name = <span class="str">"PhysicalExpand"</span>
+    
+    <span class="kw">def</span> <span class="fn">apply</span>(
+        <span class="kw">self</span>, bank: Bank,
+        note_id: <span class="kw">str</span>,
+        target_k_max: <span class="kw">int</span> = 60,
+        estimate_from_k: <span class="kw">int</span> = 15,         <span class="cmt"># fit na k=1..15 pak extrapoluj</span>
+        fit_quality_min: <span class="kw">float</span> = 0.75,
+        B_override: Optional[<span class="kw">float</span>] = <span class="kw">None</span>, <span class="cmt"># inharmonicity, jinak z note.B</span>
+        gamma_tau_ratio: <span class="kw">float</span> = 10.0,     <span class="cmt"># τ₂/τ₁</span>
+        replace_poor_fits: <span class="kw">bool</span> = <span class="kw">True</span>,   <span class="cmt"># i přepíše existující low-quality partials</span>
+    ) -> Tuple[Bank, EditRecord]:
+        
+        note = bank.get_note(note_id)
+        f0 = note.f0_hz
+        B = B_override <span class="kw">if</span> B_override <span class="kw">is not</span> <span class="kw">None</span> <span class="kw">else</span> note.B
+        
+        <span class="cmt"># 1. Vyfiltruj dobré partials pro fit</span>
+        good = [p <span class="kw">for</span> p <span class="kw">in</span> note.partials
+                <span class="kw">if</span> p.fit_quality >= fit_quality_min
+                <span class="kw">and</span> p.k <= estimate_from_k]
+        <span class="kw">if</span> <span class="kw">len</span>(good) < 5:
+            <span class="kw">raise</span> ValidationError(<span class="str">"Need ≥5 good partials to estimate decay laws"</span>)
+        
+        <span class="cmt"># 2. Log-log fit pro α (tau1 decay) a β (amplitude decay)</span>
+        ks = np.array([p.k <span class="kw">for</span> p <span class="kw">in</span> good])
+        tau1s = np.array([p.tau1 <span class="kw">for</span> p <span class="kw">in</span> good])
+        A0s = np.array([p.A0 <span class="kw">for</span> p <span class="kw">in</span> good])
+        
+        <span class="cmt"># log(τ) = log(τ_fund) - α·log(k)  →  lineární regrese</span>
+        alpha, log_tau1_fund = np.polyfit(np.log(ks), np.log(tau1s), 1)
+        alpha = -alpha
+        tau1_fund = np.exp(log_tau1_fund)
+        
+        beta, log_A0_fund = np.polyfit(np.log(ks), np.log(A0s), 1)
+        beta = -beta
+        A0_fund = np.exp(log_A0_fund)
+        
+        <span class="cmt"># 3. Generuj partials k=1..target_k_max</span>
+        existing = {p.k: p <span class="kw">for</span> p <span class="kw">in</span> note.partials}
+        new_partials = []
+        
+        <span class="kw">for</span> k <span class="kw">in</span> <span class="kw">range</span>(1, target_k_max + 1):
+            <span class="kw">if</span> k <span class="kw">in</span> existing <span class="kw">and</span> existing[k].fit_quality >= fit_quality_min:
+                new_partials.append(existing[k])       <span class="cmt"># zachovej měřené</span>
+                <span class="kw">continue</span>
+            <span class="kw">if</span> k <span class="kw">in</span> existing <span class="kw">and</span> <span class="kw">not</span> replace_poor_fits:
+                new_partials.append(existing[k])       <span class="cmt"># nech i špatné</span>
+                <span class="kw">continue</span>
+            
+            <span class="cmt"># Fyzikální hodnoty</span>
+            f_k = k * f0 * np.sqrt(1 + B * k**2)
+            tau1_k = tau1_fund / (k ** alpha)
+            tau2_k = tau1_k * gamma_tau_ratio
+            A0_k = A0_fund / (k ** beta)
+            
+            new_partials.append(Partial(
+                k=k, f_hz=<span class="kw">float</span>(f_k), A0=<span class="kw">float</span>(A0_k),
+                tau1=<span class="kw">float</span>(tau1_k), tau2=<span class="kw">float</span>(tau2_k),
+                a1=0.6, beat_hz=0.0, phi=0.0,
+                fit_quality=0.5     <span class="cmt"># označit jako fyzikálně odhadnuté</span>
+            ))
+        
+        new_note = replace(note, partials=<span class="kw">tuple</span>(new_partials))
+        new_note = append_edit(new_note, EditRecord(
+            operator=<span class="str">"PhysicalExpand"</span>,
+            params={<span class="str">"alpha"</span>: alpha, <span class="str">"beta"</span>: beta, <span class="str">"B"</span>: B, <span class="str">"gamma"</span>: gamma_tau_ratio}
+        ))
+        new_bank = bank.with_updated_note(new_note)
+        <span class="kw">return</span> new_bank, EditRecord(...)
+</pre>
+  </div>
+
+  <div class="op">
+    <div class="op-title">
+      <span class="code-tag">API · 6.2</span>
+      <h3>API volání</h3>
+    </div>
+
+<pre class="code api"><span class="kw">POST</span> /api/ops/physical-expand
+Content-Type: application/json
+
+{
+  <span class="str">"bank_id"</span>: <span class="str">"bank_001"</span>,
+  <span class="str">"note_ids"</span>: [<span class="str">"m072_vel5"</span>],    <span class="cmt">// batch OK</span>
+  <span class="str">"target_k_max"</span>: <span class="num">60</span>,
+  <span class="str">"estimate_from_k"</span>: <span class="num">15</span>,
+  <span class="str">"fit_quality_min"</span>: <span class="num">0.75</span>,
+  <span class="str">"gamma_tau_ratio"</span>: <span class="num">10.0</span>,
+  <span class="str">"replace_poor_fits"</span>: <span class="kw">true</span>,
+  <span class="str">"commit"</span>: <span class="kw">true</span>
+}</pre>
+
+<pre class="code"><span class="cmt">// Response 200</span>
+{
+  <span class="str">"operation_id"</span>: <span class="str">"op_9c4e1"</span>,
+  <span class="str">"new_bank_id"</span>: <span class="str">"bank_001_v2"</span>,
+  <span class="str">"fitted_params"</span>: {
+    <span class="str">"m072_vel5"</span>: {
+      <span class="str">"alpha"</span>: <span class="num">0.38</span>,            <span class="cmt">// tau1 decay exponent</span>
+      <span class="str">"beta"</span>:  <span class="num">0.94</span>,            <span class="cmt">// amplitude decay exponent</span>
+      <span class="str">"B"</span>: <span class="num">0.00015</span>,              <span class="cmt">// inharmonicity</span>
+      <span class="str">"tau1_fund_fitted"</span>: <span class="num">0.221</span>,
+      <span class="str">"tau1_fund_measured"</span>: <span class="num">0.219</span>,
+      <span class="str">"fit_r_squared"</span>: <span class="num">0.987</span>
+    }
+  },
+  <span class="str">"added_partials"</span>: {
+    <span class="str">"m072_vel5"</span>: <span class="num">36</span>       <span class="cmt">// k=25..60 přidáno</span>
+  },
+  <span class="str">"replaced_partials"</span>: {
+    <span class="str">"m072_vel5"</span>: [<span class="num">21</span>, <span class="num">23</span>, <span class="num">24</span>]   <span class="cmt">// měly fit_quality &lt; 0.75</span>
+  }
+}</pre>
+  </div>
+</section>
+
+<!-- ================== SECTION 7 : OPERATION C — DEVIATION ================== -->
+<section class="section" id="sec7">
+  <div class="section-head">
+    <div class="section-num">§ 07</div>
+    <div>
+      <h2 class="section-title">Operace C — <em>Deviation Analysis</em></h2>
+      <p class="section-lead">Porovnání N extraktů v CO prostoru. Tři úrovně metrik: per-partial variance, per-note RMSE, aggregate anomaly map.</p>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="op-title">
+      <span class="code-tag">ALG · 7.1</span>
+      <h3>Metriky odchylek</h3>
+    </div>
+
+    <table>
+      <thead><tr><th>Metrika</th><th>Vzorec</th><th>Význam</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>σ<sub>k,p</sub></strong><br>Per-partial std</td>
+          <td><code>std({x<sub>i</sub>(k,p) | i ∈ sources})</code></td>
+          <td>Jak moc se extraktory shodnou na k-té harmonice pro parametr p</td>
+        </tr>
+        <tr>
+          <td><strong>RMSE<sub>ij</sub></strong><br>Pair-wise</td>
+          <td><code>√(⟨(x<sub>i</sub> - x<sub>j</sub>)²⟩<sub>k,p</sub>)</code></td>
+          <td>Celková odchylka zdroje i vs j</td>
+        </tr>
+        <tr>
+          <td><strong>z-score</strong><br>Anomalie</td>
+          <td><code>|x<sub>i</sub> - μ| / σ</code></td>
+          <td>Odhalení outlieru — která hodnota leží mimo konsenzus</td>
+        </tr>
+        <tr>
+          <td><strong>Confidence</strong><br>Agreement score</td>
+          <td><code>exp(-σ/σ<sub>threshold</sub>)</code></td>
+          <td>[0,1] — 1 = perfektní shoda, 0 = chaos</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h4>Algoritmus</h4>
+<pre class="code"><span class="cmt"># piano_core/analysis/deviation.py</span>
+
+<span class="kw">def</span> <span class="fn">compute_deviation</span>(
+    banks: List[Bank],
+    midi: <span class="kw">int</span>,
+    velocity: <span class="kw">int</span>,
+    parameters: List[<span class="kw">str</span>] = [<span class="str">"tau1_coef"</span>, <span class="str">"tau2_coef"</span>, <span class="str">"A0_coef"</span>],
+    k_range: Tuple[<span class="kw">int</span>, <span class="kw">int</span>] = (1, 60),
+    z_threshold: <span class="kw">float</span> = 2.5,           <span class="cmt"># nad 2.5σ = anomálie</span>
+) -> DeviationReport:
+    
+    <span class="cmt"># 1. Normalizuj všechny banky na CO</span>
+    coefs = [b.get_note_by_midi_vel(midi, velocity).to_coefficients()
+             <span class="kw">for</span> b <span class="kw">in</span> banks]
+    source_names = [b.source <span class="kw">for</span> b <span class="kw">in</span> banks]
+    
+    per_partial = {}
+    consensus = []
+    anomalies = []
+    
+    <span class="cmt"># 2. Per-partial analysis</span>
+    <span class="kw">for</span> k <span class="kw">in</span> <span class="kw">range</span>(k_range[0], k_range[1] + 1):
+        per_partial[k] = {}
+        <span class="kw">for</span> param <span class="kw">in</span> parameters:
+            values = []
+            sources_present = []
+            <span class="kw">for</span> c, name <span class="kw">in</span> <span class="kw">zip</span>(coefs, source_names):
+                p = c.get_partial(k)
+                <span class="kw">if</span> p <span class="kw">is not</span> <span class="kw">None</span> <span class="kw">and</span> p.fit_quality > 0.3:
+                    values.append(getattr(p, param))
+                    sources_present.append(name)
+            <span class="kw">if</span> <span class="kw">len</span>(values) < 2:
+                <span class="kw">continue</span>
+            
+            mu = np.mean(values)
+            sigma = np.std(values)
+            <span class="cmt"># weighted consensus = inverse-variance</span>
+            weights = np.array([1/(0.01 + p.fit_quality) <span class="kw">for</span> p <span class="kw">in</span> ...])
+            consensus_val = np.average(values, weights=weights)
+            
+            per_partial[k][param] = {
+                <span class="str">"mean"</span>: mu,
+                <span class="str">"std"</span>: sigma,
+                <span class="str">"consensus"</span>: consensus_val,
+                <span class="str">"confidence"</span>: np.exp(-sigma / 0.05),
+                <span class="str">"per_source"</span>: <span class="kw">dict</span>(<span class="kw">zip</span>(sources_present, values)),
+            }
+            
+            <span class="cmt"># z-score anomaly detection</span>
+            <span class="kw">for</span> src, val <span class="kw">in</span> <span class="kw">zip</span>(sources_present, values):
+                <span class="kw">if</span> sigma > 0:
+                    z = <span class="kw">abs</span>(val - mu) / sigma
+                    <span class="kw">if</span> z > z_threshold:
+                        anomalies.append(Anomaly(
+                            k=k, parameter=param, source=src,
+                            value=val, consensus=mu, z_score=z
+                        ))
+    
+    <span class="cmt"># 3. Pair-wise RMSE</span>
+    rmse_pairs = {}
+    <span class="kw">for</span> i, j <span class="kw">in</span> itertools.combinations(<span class="kw">range</span>(<span class="kw">len</span>(banks)), 2):
+        diffs_squared = []
+        <span class="kw">for</span> k <span class="kw">in</span> <span class="kw">range</span>(*k_range):
+            <span class="kw">for</span> param <span class="kw">in</span> parameters:
+                pi = coefs[i].get_partial(k)
+                pj = coefs[j].get_partial(k)
+                <span class="kw">if</span> pi <span class="kw">and</span> pj:
+                    d = getattr(pi, param) - getattr(pj, param)
+                    diffs_squared.append(d * d)
+        rmse_pairs[<span class="str">f"{source_names[i]}_vs_{source_names[j]}"</span>] = np.sqrt(np.mean(diffs_squared))
+    
+    <span class="kw">return</span> DeviationReport(
+        per_partial=per_partial,
+        rmse_pairs=rmse_pairs,
+        anomalies=anomalies,
+        overall_confidence=np.mean([pp[<span class="str">"confidence"</span>] <span class="kw">for</span> ...])
+    )
+</pre>
+  </div>
+
+  <div class="op">
+    <div class="op-title">
+      <span class="code-tag">API · 7.2</span>
+      <h3>API volání + response</h3>
+    </div>
+
+<pre class="code api"><span class="kw">POST</span> /api/analysis/deviation
+Content-Type: application/json
+
+{
+  <span class="str">"bank_ids"</span>: [<span class="str">"bank_partialis"</span>, <span class="str">"bank_ddsp"</span>, <span class="str">"bank_custom"</span>],
+  <span class="str">"midi"</span>: <span class="num">60</span>,
+  <span class="str">"velocity"</span>: <span class="num">5</span>,
+  <span class="str">"parameters"</span>: [<span class="str">"tau1_coef"</span>, <span class="str">"tau2_coef"</span>, <span class="str">"A0_coef"</span>],
+  <span class="str">"k_range"</span>: [<span class="num">1</span>, <span class="num">60</span>],
+  <span class="str">"z_threshold"</span>: <span class="num">2.5</span>
+}</pre>
+
+<pre class="code"><span class="cmt">// Response 200</span>
+{
+  <span class="str">"midi"</span>: <span class="num">60</span>, <span class="str">"velocity"</span>: <span class="num">5</span>,
+  <span class="str">"overall_confidence"</span>: <span class="num">0.91</span>,
+  
+  <span class="str">"per_partial"</span>: {
+    <span class="str">"k=1"</span>: {
+      <span class="str">"tau1_coef"</span>: {
+        <span class="str">"mean"</span>: <span class="num">1.0</span>,
+        <span class="str">"std"</span>: <span class="num">0.0</span>,
+        <span class="str">"consensus"</span>: <span class="num">1.0</span>,
+        <span class="str">"confidence"</span>: <span class="num">1.0</span>,
+        <span class="str">"per_source"</span>: {<span class="str">"Partialis"</span>: <span class="num">1.0</span>, <span class="str">"DDSP"</span>: <span class="num">1.0</span>, <span class="str">"Custom"</span>: <span class="num">1.0</span>}
+      }
+    },
+    <span class="str">"k=15"</span>: {
+      <span class="str">"tau1_coef"</span>: {
+        <span class="str">"mean"</span>: <span class="num">0.312</span>,
+        <span class="str">"std"</span>: <span class="num">0.041</span>,          <span class="cmt">// ← větší variance</span>
+        <span class="str">"consensus"</span>: <span class="num">0.309</span>,
+        <span class="str">"confidence"</span>: <span class="num">0.44</span>,
+        <span class="str">"per_source"</span>: {
+          <span class="str">"Partialis"</span>: <span class="num">0.318</span>,
+          <span class="str">"DDSP"</span>: <span class="num">0.305</span>,
+          <span class="str">"Custom"</span>: <span class="num">0.379</span>   <span class="cmt">// ← outlier</span>
+        }
+      }
+    }
+  },
+  
+  <span class="str">"rmse_pairs"</span>: {
+    <span class="str">"Partialis_vs_DDSP"</span>: <span class="num">0.0094</span>,
+    <span class="str">"Partialis_vs_Custom"</span>: <span class="num">0.0287</span>,
+    <span class="str">"DDSP_vs_Custom"</span>: <span class="num">0.0301</span>
+  },
+  
+  <span class="str">"anomalies"</span>: [
+    {
+      <span class="str">"k"</span>: <span class="num">15</span>, <span class="str">"parameter"</span>: <span class="str">"tau1_coef"</span>,
+      <span class="str">"source"</span>: <span class="str">"Custom"</span>, <span class="str">"value"</span>: <span class="num">0.379</span>,
+      <span class="str">"consensus"</span>: <span class="num">0.309</span>, <span class="str">"z_score"</span>: <span class="num">2.73</span>
+    },
+    {
+      <span class="str">"k"</span>: <span class="num">22</span>, <span class="str">"parameter"</span>: <span class="str">"A0_coef"</span>,
+      <span class="str">"source"</span>: <span class="str">"DDSP"</span>, <span class="str">"value"</span>: <span class="num">0.014</span>,
+      <span class="str">"consensus"</span>: <span class="num">0.041</span>, <span class="str">"z_score"</span>: <span class="num">3.12</span>
+    }
+  ]
+}</pre>
+  </div>
+
+  <div class="note ok">
+    <strong>Navazující akce:</strong> Výsledek deviation reportu slouží jako <em>vstup</em> pro:
+    (a) vytvoření anchoru s <code>consensus</code> hodnotami,
+    (b) spuštění <code>SplineTransferOperator</code> z notou bez anomálií na notu s anomáliemi,
+    (c) manuální review anomálií v UI (heatmap zvýrazní k=15 a k=22).
+  </div>
+</section>
+
+<!-- ================== SECTION 8 : VIEWSTATE ================== -->
+<section class="section" id="sec8">
+  <div class="section-head">
+    <div class="section-num">§ 08</div>
+    <div>
+      <h2 class="section-title">ViewState &amp; <em>UI kontrola</em></h2>
+      <p class="section-lead">Formální model pohledu na data — co je viditelné, co je filtrováno, jak se porovnává. Serializovatelný, shareable, versioned.</p>
+    </div>
+  </div>
+
+  <h3 class="sub-head">Datový model</h3>
+
+<pre class="code"><span class="cmt"># piano_core/view/viewstate.py</span>
+
+<span class="kw">@dataclass(frozen=True)</span>
+<span class="kw">class</span> <span class="fn">ViewState</span>:
+    <span class="cmt">"""Serializovatelný pohled. Žádná data — jen konfigurace."""</span>
+    
+    <span class="cmt"># === SELEKCE DAT ===</span>
+    selected_midi: <span class="kw">int</span> = 60
+    selected_velocity: <span class="kw">int</span> = 5
+    selected_bank_ids: Tuple[<span class="kw">str</span>, ...] = ()       <span class="cmt"># které banky zobrazit</span>
+    
+    <span class="cmt"># === ZOBRAZENÉ PARAMETRY (togglable) ===</span>
+    visible_parameters: FrozenSet[<span class="kw">str</span>] = frozenset({
+        <span class="str">"tau1_coef"</span>, <span class="str">"tau2_coef"</span>, <span class="str">"A0_coef"</span>
+    })
+    <span class="cmt"># všechny možnosti: tau1_coef, tau2_coef, A0_coef, a1,</span>
+    <span class="cmt">#                   beat_hz_coef, phi, fit_quality, f_coef</span>
+    
+    <span class="cmt"># === FILTRY ===</span>
+    k_range: Tuple[<span class="kw">int</span>, <span class="kw">int</span>] = (1, 60)
+    fit_quality_min: <span class="kw">float</span> = 0.0                  <span class="cmt"># slider 0-1</span>
+    hide_physically_estimated: <span class="kw">bool</span> = <span class="kw">False</span>      <span class="cmt"># fit_quality == 0.5 = odhad</span>
+    
+    <span class="cmt"># === ŠKÁLY ===</span>
+    x_axis: <span class="kw">str</span> = <span class="str">"k"</span>                         <span class="cmt"># "k" | "f_coef" | "log_f_coef" | "f_hz"</span>
+    y_scale: <span class="kw">str</span> = <span class="str">"linear"</span>                    <span class="cmt"># "linear" | "log"</span>
+    y_normalized: <span class="kw">bool</span> = <span class="kw">True</span>                  <span class="cmt"># True = CO, False = AB</span>
+    
+    <span class="cmt"># === OVERLAY LAYERS ===</span>
+    show_anchors: <span class="kw">bool</span> = <span class="kw">True</span>
+    show_consensus_line: <span class="kw">bool</span> = <span class="kw">True</span>
+    show_variance_band: <span class="kw">bool</span> = <span class="kw">True</span>             <span class="cmt"># ±σ band kolem konsenzu</span>
+    show_anomaly_markers: <span class="kw">bool</span> = <span class="kw">True</span>            <span class="cmt"># červené body nad z_threshold</span>
+    show_spline_preview: <span class="kw">bool</span> = <span class="kw">False</span>            <span class="cmt"># když je aktivní transfer</span>
+    show_physical_prediction: <span class="kw">bool</span> = <span class="kw">False</span>       <span class="cmt"># fyzikální model jako čára</span>
+    show_fit_quality_heatmap: <span class="kw">bool</span> = <span class="kw">False</span>
+    
+    <span class="cmt"># === COMPARISON MODE ===</span>
+    comparison_mode: <span class="kw">str</span> = <span class="str">"overlay"</span>
+    <span class="cmt"># "overlay"       — všechny zdroje překrývající v jednom grafu</span>
+    <span class="cmt"># "side_by_side"  — grid N panelů</span>
+    <span class="cmt"># "diff"          — zobraz odchylky od reference</span>
+    <span class="cmt"># "consensus"     — jen konsenzus + variance band</span>
+    diff_reference_bank: Optional[<span class="kw">str</span>] = <span class="kw">None</span>
+    
+    <span class="cmt"># === EDIT MODE ===</span>
+    edit_mode: <span class="kw">str</span> = <span class="str">"view"</span>
+    <span class="cmt"># "view"           — jen čtení</span>
+    <span class="cmt"># "anchor_place"   — klik přidává anchor</span>
+    <span class="cmt"># "spline_edit"    — drag bodů spline křivky</span>
+    <span class="cmt"># "partial_select" — multi-select k pro operace</span>
+    
+    <span class="cmt"># === COLORING ===</span>
+    color_by: <span class="kw">str</span> = <span class="str">"source"</span>    <span class="cmt"># "source" | "fit_quality" | "confidence" | "provenance"</span>
+    
+    <span class="kw">def</span> <span class="fn">toggle_parameter</span>(<span class="kw">self</span>, param: <span class="kw">str</span>) -> <span class="str">"ViewState"</span>:
+        new_set = <span class="kw">self</span>.visible_parameters ^ {param}
+        <span class="kw">return</span> replace(<span class="kw">self</span>, visible_parameters=new_set)
+    
+    <span class="kw">def</span> <span class="fn">to_dict</span>(<span class="kw">self</span>) -> <span class="kw">dict</span>: ...
+    <span class="kw">def</span> <span class="fn">from_dict</span>(d: <span class="kw">dict</span>) -> <span class="str">"ViewState"</span>: ...
+</pre>
+
+  <h3 class="sub-head">Control panel — mockup</h3>
+
+  <div class="mock-panel">
+    <div class="mock-row">
+      <span class="mock-label">Selection</span>
+      <span class="mock-value">MIDI <span class="mock-toggle ab">60</span>&nbsp;&nbsp;Velocity <span class="mock-toggle ab">5</span>&nbsp;&nbsp;Banks <span class="mock-toggle on">Partialis</span><span class="mock-toggle on">DDSP</span><span class="mock-toggle off">Custom</span></span>
+    </div>
+    <div class="mock-row">
+      <span class="mock-label">Parameters</span>
+      <span class="mock-value">
+        <span class="mock-toggle on">τ₁_coef</span><span class="mock-toggle on">τ₂_coef</span><span class="mock-toggle off">A₀_coef</span><span class="mock-toggle off">a₁</span><span class="mock-toggle off">beat_hz</span><span class="mock-toggle off">φ</span><span class="mock-toggle off">fit_q</span>
+      </span>
+    </div>
+    <div class="mock-row">
+      <span class="mock-label">K range</span>
+      <span class="mock-value">[<span class="mock-toggle ab">1</span> ─────●────── <span class="mock-toggle ab">60</span>]</span>
+    </div>
+    <div class="mock-row">
+      <span class="mock-label">Filters</span>
+      <span class="mock-value">fit_quality ≥ <span class="mock-toggle ab">0.7</span>&nbsp;&nbsp;<span class="mock-toggle off">hide estimated</span></span>
+    </div>
+    <div class="mock-row">
+      <span class="mock-label">Axes</span>
+      <span class="mock-value">X: <span class="mock-toggle on">k</span> <span class="mock-toggle off">log(f/f₀)</span>&nbsp;&nbsp;Y: <span class="mock-toggle on">linear</span> <span class="mock-toggle off">log</span>&nbsp;&nbsp;<span class="mock-toggle on">CO</span> <span class="mock-toggle off">AB</span></span>
+    </div>
+    <div class="mock-row">
+      <span class="mock-label">Overlays</span>
+      <span class="mock-value">
+        <span class="mock-toggle on">anchors ★</span><span class="mock-toggle on">consensus</span><span class="mock-toggle on">±σ band</span><span class="mock-toggle on">anomalies</span><span class="mock-toggle off">spline preview</span><span class="mock-toggle off">physics model</span>
+      </span>
+    </div>
+    <div class="mock-row">
+      <span class="mock-label">Compare</span>
+      <span class="mock-value"><span class="mock-toggle on">overlay</span> <span class="mock-toggle off">side-by-side</span> <span class="mock-toggle off">diff</span> <span class="mock-toggle off">consensus only</span></span>
+    </div>
+    <div class="mock-row">
+      <span class="mock-label">Color by</span>
+      <span class="mock-value"><span class="mock-toggle on">source</span> <span class="mock-toggle off">fit_quality</span> <span class="mock-toggle off">confidence</span> <span class="mock-toggle off">provenance</span></span>
+    </div>
+    <div class="mock-row">
+      <span class="mock-label">Edit mode</span>
+      <span class="mock-value"><span class="mock-toggle on">view</span> <span class="mock-toggle off">anchor ★</span> <span class="mock-toggle off">spline ∿</span> <span class="mock-toggle off">multi-select</span></span>
+    </div>
+  </div>
+
+  <h3 class="sub-head">Chování toggle operací</h3>
+
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 8.1 · Tok toggle → render</span><span class="tag tag-ok">UI flow</span></div>
+<pre class="mermaid">
+flowchart LR
+    CLICK["👆 Uživatel klikne<br/>toggle τ₂_coef"]
+    VS1["ViewState v1<br/>{τ₁, τ₂}"]
+    VS2["ViewState v2<br/>{τ₁}"]
+    PUT["PUT /api/viewstate<br/>(server persist)"]
+    RENDER["Re-render grafu<br/>(jen τ₁ křivka)"]
+
+    CLICK --> VS1
+    VS1 -. toggle_parameter('τ₂') .-> VS2
+    VS2 --> RENDER
+    VS2 -. async .-> PUT
+
+    classDef ui fill:#1c1f28,stroke:#7dd87a,color:#7dd87a
+    classDef state fill:#1c1f28,stroke:#52d1c2,color:#52d1c2
+    classDef api fill:#1c1f28,stroke:#f2e05f,color:#f2e05f
+    class CLICK,RENDER ui
+    class VS1,VS2 state
+    class PUT api
+</pre>
+  </div>
+
+  <h3 class="sub-head">Presets (uložené pohledy)</h3>
+
+<pre class="code"><span class="cmt">// Jednotlivé pohledy se dají uložit jako preset pod názvem</span>
+{
+  <span class="str">"preset_id"</span>: <span class="str">"anomaly_hunt"</span>,
+  <span class="str">"name"</span>: <span class="str">"🔍 Lov anomálií"</span>,
+  <span class="str">"viewstate"</span>: {
+    <span class="str">"selected_bank_ids"</span>: [<span class="str">"bank_partialis"</span>, <span class="str">"bank_ddsp"</span>, <span class="str">"bank_custom"</span>],
+    <span class="str">"visible_parameters"</span>: [<span class="str">"tau1_coef"</span>],
+    <span class="str">"comparison_mode"</span>: <span class="str">"diff"</span>,
+    <span class="str">"diff_reference_bank"</span>: <span class="str">"bank_partialis"</span>,
+    <span class="str">"show_anomaly_markers"</span>: <span class="kw">true</span>,
+    <span class="str">"show_variance_band"</span>: <span class="kw">true</span>,
+    <span class="str">"fit_quality_min"</span>: <span class="num">0.7</span>,
+    <span class="str">"color_by"</span>: <span class="str">"confidence"</span>
+  }
+}
+
+{
+  <span class="str">"preset_id"</span>: <span class="str">"physics_verify"</span>,
+  <span class="str">"name"</span>: <span class="str">"⚛ Fyzikální verifikace"</span>,
+  <span class="str">"viewstate"</span>: {
+    <span class="str">"visible_parameters"</span>: [<span class="str">"tau1_coef"</span>, <span class="str">"A0_coef"</span>],
+    <span class="str">"y_scale"</span>: <span class="str">"log"</span>,
+    <span class="str">"show_physical_prediction"</span>: <span class="kw">true</span>,  <span class="cmt">// physics curve jako čára</span>
+    <span class="str">"comparison_mode"</span>: <span class="str">"overlay"</span>,
+    <span class="str">"hide_physically_estimated"</span>: <span class="kw">false</span>
+  }
+}
+
+{
+  <span class="str">"preset_id"</span>: <span class="str">"spline_edit"</span>,
+  <span class="str">"name"</span>: <span class="str">"∿ Úprava spline"</span>,
+  <span class="str">"viewstate"</span>: {
+    <span class="str">"selected_bank_ids"</span>: [<span class="str">"bank_partialis"</span>],
+    <span class="str">"visible_parameters"</span>: [<span class="str">"tau1_coef"</span>],
+    <span class="str">"edit_mode"</span>: <span class="str">"spline_edit"</span>,
+    <span class="str">"show_spline_preview"</span>: <span class="kw">true</span>,
+    <span class="str">"comparison_mode"</span>: <span class="str">"overlay"</span>
+  }
+}</pre>
+
+  <h3 class="sub-head">API pro ViewState</h3>
+
+<pre class="code api"><span class="cmt"># Uložení / načtení pohledu</span>
+<span class="kw">GET</span>    /api/viewstate/{id}
+<span class="kw">PUT</span>    /api/viewstate/{id}
+<span class="kw">POST</span>   /api/viewstate/presets            <span class="cmt"># uložit jako preset</span>
+<span class="kw">GET</span>    /api/viewstate/presets            <span class="cmt"># seznam presetů</span>
+
+<span class="cmt"># Získat data podle aktuálního viewstatu (server-side filtering)</span>
+<span class="kw">POST</span>   /api/view/render
+Body: { <span class="str">"viewstate"</span>: {...} }
+Response: {
+  <span class="str">"series"</span>: [
+    {<span class="str">"source"</span>: <span class="str">"Partialis"</span>, <span class="str">"parameter"</span>: <span class="str">"tau1_coef"</span>,
+     <span class="str">"points"</span>: [[k, value], ...], <span class="str">"color"</span>: <span class="str">"#e8a33d"</span>}
+  ],
+  <span class="str">"overlays"</span>: {
+    <span class="str">"consensus"</span>: [[k, mean], ...],
+    <span class="str">"variance_band"</span>: [[k, mean-σ, mean+σ], ...],
+    <span class="str">"anomalies"</span>: [{k, source, z_score}, ...],
+    <span class="str">"anchors"</span>: [{k, value, weight}, ...]
+  },
+  <span class="str">"axes"</span>: { <span class="str">"x"</span>: {...}, <span class="str">"y"</span>: {...} }
+}</pre>
+
+  <div class="note ok">
+    <strong>Proč server-side rendering:</strong> Filtrování 60 000 partialů dle viewstate je efektivnější na backendu. Frontend dostává už jen křivky k vykreslení. Výhoda: konzistence mezi klienty, nižší síťový provoz, snadnější export pohledu jako PNG/SVG.
+  </div>
+</section>
+
+<!-- ================== SECTION 9 : API MAP ================== -->
+<section class="section" id="sec9">
+  <div class="section-head">
+    <div class="section-num">§ 09</div>
+    <div>
+      <h2 class="section-title">Revidovaná <em>API mapa</em></h2>
+      <p class="section-lead">Přeorganizováno kolem operators místo ad-hoc endpointů. Batch &amp; streaming od začátku.</p>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 9.1 · API struktura v0.3</span><span class="tag tag-flow">API v3</span></div>
+<pre class="mermaid">
+flowchart LR
+    API["🌐 FastAPI :8000"]
+
+    subgraph D1["/api/banks"]
+        direction TB
+        D1a["POST · upload"]
+        D1b["GET · list / detail"]
+        D1c["GET /note/{id}"]
+        D1d["GET /history · edit history"]
+        D1e["POST /rollback/{parent_id}"]
+    end
+
+    subgraph D2["/api/ops · Operators"]
+        direction TB
+        D2a["POST /spline-transfer"]
+        D2b["POST /physical-expand"]
+        D2c["POST /consensus-merge"]
+        D2d["POST /anchor-interpolate"]
+        D2e["POST /vae-smooth · optional"]
+        D2f["POST /batch · chain ops"]
+    end
+
+    subgraph D3["/api/analysis"]
+        direction TB
+        D3a["POST /deviation"]
+        D3b["POST /anomaly-map"]
+        D3c["POST /confidence-heatmap"]
+    end
+
+    subgraph D4["/api/anchors"]
+        direction TB
+        D4a["CRUD"]
+        D4b["POST /from-consensus"]
+    end
+
+    subgraph D5["/api/view"]
+        direction TB
+        D5a["POST /render · server-side filter"]
+        D5b["GET /presets"]
+        D5c["CRUD /viewstate/{id}"]
+    end
+
+    subgraph D6["/ws · WebSocket"]
+        direction TB
+        D6a["/ws/ops · progress stream"]
+        D6b["/ws/collab · multi-user (F5)"]
+    end
+
+    subgraph D7["/api/export"]
+        direction TB
+        D7a["GET /{id} · JSON"]
+        D7b["GET /{id}/svg · current view"]
+    end
+
+    API --> D1
+    API --> D2
+    API --> D3
+    API --> D4
+    API --> D5
+    API --> D6
+    API --> D7
+
+    classDef api fill:#1c1f28,stroke:#9fb4ff,color:#9fb4ff
+    classDef ab fill:#14161c,stroke:#e8a33d,color:#e8a33d
+    classDef op fill:#14161c,stroke:#52d1c2,color:#52d1c2
+    classDef ana fill:#14161c,stroke:#f2e05f,color:#f2e05f
+    classDef anc fill:#14161c,stroke:#f2e05f,color:#f2e05f
+    classDef ui fill:#14161c,stroke:#7dd87a,color:#7dd87a
+    classDef ws fill:#14161c,stroke:#d97fbb,color:#d97fbb
+    classDef exp fill:#14161c,stroke:#8b8679,color:#f5f1e8
+    class API api
+    class D1,D1a,D1b,D1c,D1d,D1e ab
+    class D2,D2a,D2b,D2c,D2d,D2e,D2f op
+    class D3,D3a,D3b,D3c ana
+    class D4,D4a,D4b anc
+    class D5,D5a,D5b,D5c ui
+    class D6,D6a,D6b ws
+    class D7,D7a,D7b exp
+</pre>
+  </div>
+
+  <h4>Batch volání — chain několika operací</h4>
+<pre class="code api"><span class="kw">POST</span> /api/ops/batch
+{
+  <span class="str">"bank_id"</span>: <span class="str">"bank_001"</span>,
+  <span class="str">"stop_on_error"</span>: <span class="kw">true</span>,
+  <span class="str">"operations"</span>: [
+    {
+      <span class="str">"operator"</span>: <span class="str">"PhysicalExpand"</span>,
+      <span class="str">"params"</span>: {<span class="str">"note_ids"</span>: [<span class="str">"m072_vel5"</span>], <span class="str">"target_k_max"</span>: <span class="num">60</span>}
+    },
+    {
+      <span class="str">"operator"</span>: <span class="str">"SplineTransfer"</span>,
+      <span class="str">"params"</span>: {
+        <span class="str">"source_note_id"</span>: <span class="str">"m072_vel5"</span>,
+        <span class="str">"target_note_ids"</span>: [<span class="str">"m072_vel0"</span>, <span class="str">"m072_vel1"</span>, <span class="str">"m072_vel7"</span>],
+        <span class="str">"parameter"</span>: <span class="str">"tau1"</span>
+      }
+    },
+    {
+      <span class="str">"operator"</span>: <span class="str">"ConsensusMerge"</span>,
+      <span class="str">"params"</span>: {<span class="str">"with_bank_ids"</span>: [<span class="str">"bank_ddsp"</span>], <span class="str">"weights"</span>: [<span class="num">0.7</span>, <span class="num">0.3</span>]}
+    }
+  ]
+}</pre>
+
+<pre class="code"><span class="cmt">// Response 200</span>
+{
+  <span class="str">"bank_chain"</span>: [<span class="str">"bank_001"</span>, <span class="str">"bank_001_v2"</span>, <span class="str">"bank_001_v3"</span>, <span class="str">"bank_001_v4"</span>],
+  <span class="str">"final_bank_id"</span>: <span class="str">"bank_001_v4"</span>,
+  <span class="str">"edit_records"</span>: [
+    {<span class="str">"operator"</span>: <span class="str">"PhysicalExpand"</span>, <span class="str">"timestamp"</span>: <span class="str">"..."</span>, ...},
+    {<span class="str">"operator"</span>: <span class="str">"SplineTransfer"</span>, ...},
+    {<span class="str">"operator"</span>: <span class="str">"ConsensusMerge"</span>, ...}
+  ]
+}</pre>
+</section>
+
+<!-- ================== SECTION 10 : DIFF ================== -->
+<section class="section" id="sec10">
+  <div class="section-head">
+    <div class="section-num">§ 10</div>
+    <div>
+      <h2 class="section-title">Diff <em>v0.2 → v0.3</em></h2>
+      <p class="section-lead">Souhrn změn v jednom přehledu. Co se ruší, co přibývá, co zůstává.</p>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th style="width:100px">Oblast</th><th>v0.2</th><th>v0.3</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>VAE</strong></td>
+        <td><span class="delta delta-rm">▪</span> Central (Fáze 3/5), povinný</td>
+        <td><span class="delta delta-mv">→</span> Fáze 4, <strong>volitelný</strong>, jen jako <code>VAESmoothOperator</code></td>
+      </tr>
+      <tr>
+        <td><strong>Physics</strong></td>
+        <td><span class="delta delta-rm">▪</span> Nezmíněno</td>
+        <td><span class="delta delta-add">+</span> <code>piano_physics.py</code> modul + <code>PhysicalExpandOperator</code></td>
+      </tr>
+      <tr>
+        <td><strong>Splines</strong></td>
+        <td><span class="delta delta-rm">▪</span> Jen "copy decay profile"</td>
+        <td><span class="delta delta-add">+</span> <code>SplineFitter</code> + <code>SplineTransferOperator</code> (v k i midi osách)</td>
+      </tr>
+      <tr>
+        <td><strong>Bank mutability</strong></td>
+        <td><span class="delta delta-rm">▪</span> Mutable, in-place edits</td>
+        <td><span class="delta delta-mv">→</span> <strong>Immutable</strong> + parent_id + edit history + undo</td>
+      </tr>
+      <tr>
+        <td><strong>Provenance</strong></td>
+        <td><span class="delta delta-rm">▪</span> Netrackuje se</td>
+        <td><span class="delta delta-add">+</span> Každá nota má <code>Provenance</code> s řetězcem edit operací</td>
+      </tr>
+      <tr>
+        <td><strong>Operace na datech</strong></td>
+        <td><span class="delta delta-rm">▪</span> Ad-hoc funkce v <code>corrections.py</code></td>
+        <td><span class="delta delta-mv">→</span> <strong>Operator pattern</strong> s apply/preview/validate/undo</td>
+      </tr>
+      <tr>
+        <td><strong>Anchor weight</strong></td>
+        <td><span class="delta delta-rm">▪</span> Ordinál 1-9</td>
+        <td><span class="delta delta-mv">→</span> Spojité [0,1] + typologie <code>kind</code></td>
+      </tr>
+      <tr>
+        <td><strong>View/UI</strong></td>
+        <td><span class="delta delta-rm">▪</span> Ad-hoc UI prvky</td>
+        <td><span class="delta delta-add">+</span> Formální <code>ViewState</code> objekt + presets + server-side render</td>
+      </tr>
+      <tr>
+        <td><strong>API granularita</strong></td>
+        <td><span class="delta delta-rm">▪</span> Per-note endpointy</td>
+        <td><span class="delta delta-add">+</span> Batch <code>/ops/batch</code> + WebSocket progress</td>
+      </tr>
+      <tr>
+        <td><strong>"VAE" jako source</strong></td>
+        <td><span class="delta delta-rm">▪</span> Uvedeno jako extraktor</td>
+        <td><span class="delta delta-mv">→</span> Odebráno; jen Partialis/DDSP/Custom</td>
+      </tr>
+      <tr>
+        <td><strong>Deviation metrics</strong></td>
+        <td><span class="delta delta-rm">▪</span> Zmíněno vágně ("variance")</td>
+        <td><span class="delta delta-add">+</span> Explicitní per-partial σ, RMSE pairs, z-score anomálie, confidence</td>
+      </tr>
+      <tr>
+        <td><strong>Frontend stack</strong></td>
+        <td><span class="delta delta-rm">▪</span> Electron + Three.js</td>
+        <td><span class="delta delta-mv">→</span> Web-first; Three.js jen pro VAE latent (F4)</td>
+      </tr>
+      <tr>
+        <td><strong>Fází</strong></td>
+        <td>6 stagů (W1-5)</td>
+        <td><strong>5 fází</strong> (W1-12, F4+F5 volitelné)</td>
+      </tr>
+      <tr style="border-top:2px solid var(--co)">
+        <td><strong>Zachováno</strong></td>
+        <td colspan="2" style="color:var(--ok)">AB↔CO reverzibilita · f0_hz invariant · MIDI 21-108 · ICR JSON kompatibilita · základní per-partial struktura</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ================== CLOSING ================== -->
+<div class="divider"></div>
+
+<section class="section" id="closing">
+  <div class="section-head">
+    <div class="section-num">§ ◈</div>
+    <div>
+      <h2 class="section-title">Závěr</h2>
+      <p class="section-lead">Architektura, která je ready pro kód, s jasnými vrstvami a operátory jako zvukový "Unix philosophy".</p>
+    </div>
+  </div>
+
+  <p>v0.3 je <strong>kompaktnější</strong> než v0.2 navzdory tomu, že přidává tři hlavní operace a ViewState vrstvu. Důvod: redukce VAE z centra na volitelnou komponentu uvolnila architektonický prostor, který byl nahrazen praktičtějšími abstrakcemi (Operator pattern, immutable Bank, piano_physics).</p>
+
+  <p>Doporučený start: <strong>Fáze 1 + 2 paralelně</strong>. F1 dodá core model a I/O, F2 začne implementací <code>SplineTransferOperator</code> jako prvního operátoru — ten je nejsnazší validovat proti existujícím datům a zároveň je to nejhodnotnější operace pro editor.</p>
+
+  <div class="note ok">
+    <strong>Kritérium hotovosti MVP:</strong> Načíst 3 banky (Partialis, DDSP, Custom) → spustit deviation analýzu → identifikovat anomálie → aplikovat spline transfer na opravu → exportovat konsolidovanou banku. Celý flow bez VAE, bez Electronu, čistě v prohlížeči.
+  </div>
+</section>
+
+<footer class="footer">
+  <span>v0.3 · Kritická revize</span>
+  <span>10 sekcí · 3 operace · 1 ViewState</span>
+  <span>Ready for F1 🛠</span>
+</footer>
+
+</div>
+
+<script>
+mermaid.initialize({
+  startOnLoad: true,
+  theme: 'base',
+  themeVariables: {
+    background: 'transparent',
+    primaryColor: '#1c1f28',
+    primaryTextColor: '#f5f1e8',
+    primaryBorderColor: '#52d1c2',
+    lineColor: '#8b8679',
+    secondaryColor: '#14161c',
+    tertiaryColor: '#0d0e12',
+    mainBkg: '#1c1f28',
+    nodeBkg: '#1c1f28',
+    clusterBkg: '#0d0e12',
+    clusterBorder: '#2a2d37',
+    defaultLinkColor: '#8b8679',
+    titleColor: '#f5f1e8',
+    edgeLabelBackground: '#0d0e12',
+    textColor: '#f5f1e8',
+    fontFamily: 'IBM Plex Mono, monospace',
+    fontSize: '13px',
+    classText: '#f5f1e8'
+  },
+  flowchart: { curve: 'basis', padding: 20, useMaxWidth: true, htmlLabels: true },
+  sequence: { actorMargin: 60, useMaxWidth: true },
+  classDiagram: { useMaxWidth: true }
+});
+</script>
+
+</body>
+</html>

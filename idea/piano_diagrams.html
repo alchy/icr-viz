@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Piano Spectral Editor — Vizuální Specifikace v0.2</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,700;9..144,900&family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+
+<style>
+:root{
+  --ink: #0d0e12;
+  --ink-2: #14161c;
+  --ink-3: #1c1f28;
+  --paper: #f5f1e8;
+  --paper-dim: #d9d3c3;
+  --muted: #8b8679;
+  --rule: #2a2d37;
+
+  /* three conceptual colors */
+  --ab: #e8a33d;      /* amber – Absolute space (concrete, measured) */
+  --co: #52d1c2;      /* teal  – Coefficient space (normalized) */
+  --vae: #d97fbb;     /* rose  – Latent space (learned) */
+  --anchor: #f2e05f;  /* yellow – anchors (human truth) */
+  --accent: #9fb4ff;  /* soft blue – meta / flow */
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+
+html,body{background:var(--ink);color:var(--paper);font-family:'IBM Plex Sans',sans-serif;font-weight:300;line-height:1.6;-webkit-font-smoothing:antialiased}
+
+body{
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 0%, rgba(232,163,61,0.06), transparent 60%),
+    radial-gradient(ellipse 70% 50% at 100% 100%, rgba(217,127,187,0.05), transparent 60%),
+    var(--ink);
+  min-height:100vh;
+  padding-bottom:120px;
+}
+
+/* grain */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:0.25;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/></svg>");
+}
+
+.wrap{max-width:1200px;margin:0 auto;padding:64px 32px;position:relative;z-index:2}
+
+/* — HERO — */
+.hero{border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:80px 0 60px;margin-bottom:80px;position:relative}
+.hero .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.25em;color:var(--ab);text-transform:uppercase;margin-bottom:24px;display:flex;align-items:center;gap:16px}
+.hero .eyebrow::before{content:"";width:32px;height:1px;background:var(--ab)}
+.hero h1{font-family:'Fraunces',serif;font-weight:300;font-size:clamp(48px,8vw,104px);line-height:0.95;letter-spacing:-0.03em;margin-bottom:24px}
+.hero h1 em{font-style:italic;font-weight:400;color:var(--co)}
+.hero h1 .rose{color:var(--vae);font-style:italic;font-weight:400}
+.hero .sub{font-family:'Fraunces',serif;font-weight:300;font-size:22px;color:var(--paper-dim);max-width:640px;line-height:1.4;margin-top:32px}
+.hero .meta{display:flex;gap:48px;margin-top:48px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.15em}
+.hero .meta span strong{color:var(--paper);font-weight:500;display:block;margin-top:6px;letter-spacing:0.05em;text-transform:none;font-size:14px}
+
+/* — SECTION — */
+.section{margin-bottom:100px;scroll-margin-top:40px}
+.section-head{display:grid;grid-template-columns:120px 1fr;gap:32px;align-items:baseline;margin-bottom:48px;padding-bottom:24px;border-bottom:1px solid var(--rule)}
+.section-num{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--muted);letter-spacing:0.2em;padding-top:8px}
+.section-title{font-family:'Fraunces',serif;font-weight:400;font-size:clamp(32px,4vw,48px);line-height:1.05;letter-spacing:-0.02em}
+.section-title em{font-style:italic;color:var(--co)}
+.section-lead{grid-column:2;font-family:'Fraunces',serif;font-weight:300;font-size:19px;color:var(--paper-dim);max-width:720px;line-height:1.5;margin-top:16px;font-style:italic}
+
+/* — DIAGRAM CARD — */
+.diagram{background:var(--ink-2);border:1px solid var(--rule);border-radius:2px;padding:32px;margin-bottom:24px;position:relative;overflow:hidden}
+.diagram::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0.4}
+.diagram-label{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.2em;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center}
+.diagram-label .tag{padding:3px 10px;border:1px solid currentColor;border-radius:2px;font-size:10px}
+.tag-ab{color:var(--ab)}
+.tag-co{color:var(--co)}
+.tag-vae{color:var(--vae)}
+.tag-flow{color:var(--accent)}
+.tag-anchor{color:var(--anchor)}
+
+.mermaid{background:transparent!important;display:flex;justify-content:center;font-family:'IBM Plex Mono',monospace!important}
+.mermaid svg{max-width:100%;height:auto!important}
+
+/* — TEXT BLOCKS — */
+.note{font-family:'IBM Plex Sans',sans-serif;font-size:14px;color:var(--paper-dim);line-height:1.65;margin-top:20px;padding:20px 24px;border-left:2px solid var(--co);background:rgba(82,209,194,0.04)}
+.note.ab{border-color:var(--ab);background:rgba(232,163,61,0.04)}
+.note.vae{border-color:var(--vae);background:rgba(217,127,187,0.04)}
+.note strong{color:var(--paper);font-weight:500}
+.note code{font-family:'IBM Plex Mono',monospace;background:var(--ink-3);padding:2px 6px;border-radius:2px;font-size:13px;color:var(--ab)}
+
+/* — TWO COLUMN — */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px}
+@media (max-width:900px){.two-col{grid-template-columns:1fr}}
+
+/* — FOOTER — */
+.footer{border-top:1px solid var(--rule);padding-top:48px;margin-top:120px;display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:0.15em;text-transform:uppercase}
+
+/* — LEGEND — */
+.legend{display:flex;gap:24px;flex-wrap:wrap;margin-top:32px;padding:24px;background:var(--ink-2);border:1px solid var(--rule);font-family:'IBM Plex Mono',monospace;font-size:12px}
+.legend-item{display:flex;align-items:center;gap:10px}
+.legend-dot{width:12px;height:12px;border-radius:2px}
+.dot-ab{background:var(--ab)}
+.dot-co{background:var(--co)}
+.dot-vae{background:var(--vae)}
+.dot-anchor{background:var(--anchor)}
+.dot-flow{background:var(--accent)}
+
+/* toc */
+.toc{background:var(--ink-2);border:1px solid var(--rule);padding:32px;margin-bottom:80px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px 32px}
+.toc a{color:var(--paper-dim);text-decoration:none;font-family:'IBM Plex Mono',monospace;font-size:12px;padding:8px 0;border-bottom:1px solid transparent;transition:all 0.2s}
+.toc a:hover{color:var(--co);border-color:var(--co);padding-left:8px}
+.toc a .n{color:var(--muted);margin-right:12px}
+
+/* highlight line */
+.divider{height:1px;background:linear-gradient(90deg,transparent,var(--rule),transparent);margin:80px 0}
+
+h3.sub-head{font-family:'Fraunces',serif;font-weight:400;font-style:italic;font-size:24px;color:var(--paper);margin:48px 0 24px;letter-spacing:-0.01em}
+
+.pill{display:inline-block;padding:3px 10px;border-radius:2px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;margin-right:6px}
+.pill-ab{background:rgba(232,163,61,0.15);color:var(--ab);border:1px solid rgba(232,163,61,0.3)}
+.pill-co{background:rgba(82,209,194,0.15);color:var(--co);border:1px solid rgba(82,209,194,0.3)}
+.pill-vae{background:rgba(217,127,187,0.15);color:var(--vae);border:1px solid rgba(217,127,187,0.3)}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<!-- ================== HERO ================== -->
+<section class="hero">
+  <div class="eyebrow">Vizuální Specifikace · v0.2 · 2026</div>
+  <h1>
+    Piano<br>
+    <em>Spectral</em><br>
+    <span class="rose">Editor.</span>
+  </h1>
+  <p class="sub">
+    Architektonický návrh v diagramech — od multi-source extraktů přes normalizovaný koeficientní prostor až po učený latentní prostor VAE a korekční anchors.
+  </p>
+  <div class="meta">
+    <span>Fáze<strong>Core Implementation</strong></span>
+    <span>Stack<strong>FastAPI · PyTorch · React</strong></span>
+    <span>Stages<strong>6 × modulární</strong></span>
+    <span>Prostory<strong>AB ↔ CO ↔ Z</strong></span>
+  </div>
+</section>
+
+<!-- ================== TOC ================== -->
+<nav class="toc">
+  <a href="#sec1"><span class="n">01</span>Systémový pohled</a>
+  <a href="#sec2"><span class="n">02</span>Problém → Řešení</a>
+  <a href="#sec3"><span class="n">03</span>Reprezentace AB ↔ CO</a>
+  <a href="#sec4"><span class="n">04</span>Datová hierarchie</a>
+  <a href="#sec5"><span class="n">05</span>Třídy a vztahy</a>
+  <a href="#sec6"><span class="n">06</span>VAE architektura</a>
+  <a href="#sec7"><span class="n">07</span>Latentní prostor</a>
+  <a href="#sec8"><span class="n">08</span>Anchors systém</a>
+  <a href="#sec9"><span class="n">09</span>FastAPI domény</a>
+  <a href="#sec10"><span class="n">10</span>Use cases</a>
+  <a href="#sec11"><span class="n">11</span>Frontend</a>
+  <a href="#sec12"><span class="n">12</span>Roadmap stages</a>
+</nav>
+
+<!-- ================== SECTION 1 : SYSTEM OVERVIEW ================== -->
+<section class="section" id="sec1">
+  <div class="section-head">
+    <div class="section-num">§ 01</div>
+    <div>
+      <h2 class="section-title">Systémový <em>pohled</em></h2>
+      <p class="section-lead">Celkový tok dat — od surových extraktů z různých modelů, přes normalizaci a VAE, až po sjednocený "ground truth" export.</p>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 1.1 · Top-level dataflow</span><span class="tag tag-flow">system overview</span></div>
+<pre class="mermaid">
+flowchart LR
+    subgraph SRC["🎹 MULTI-SOURCE EXTRAKTORY"]
+        direction TB
+        P[Partialis ICR<br/>baseline]
+        D[DDSP<br/>deep learning]
+        V[VAE raw<br/>learned]
+        C[Custom<br/>expert]
+    end
+
+    subgraph NORM["⇌ NORMALIZACE"]
+        N1[AB → CO<br/>per f0 + velocity]
+    end
+
+    subgraph LAT["🧠 LATENTNÍ PROSTOR"]
+        E[Encoder]
+        Z[z ∈ ℝ¹⁶]
+        DEC[Decoder]
+        E --> Z --> DEC
+    end
+
+    subgraph CTRL["✶ HUMAN CONTROL"]
+        A[Anchors<br/>weight 1-9]
+        ED[Editor UI<br/>drag in 2D]
+    end
+
+    subgraph OUT["📦 OUTPUT"]
+        MG[Merged Bank<br/>consensus]
+        EX[Export JSON<br/>+ confidence]
+    end
+
+    P --> N1
+    D --> N1
+    V --> N1
+    C --> N1
+    N1 --> E
+    Z -. guide .-> A
+    A -. corrective loss .-> E
+    ED -. manipulate .-> Z
+    DEC --> MG
+    MG --> EX
+
+    classDef src fill:#1c1f28,stroke:#e8a33d,color:#e8a33d
+    classDef norm fill:#1c1f28,stroke:#52d1c2,color:#52d1c2
+    classDef lat fill:#1c1f28,stroke:#d97fbb,color:#d97fbb
+    classDef ctrl fill:#1c1f28,stroke:#f2e05f,color:#f2e05f
+    classDef out fill:#1c1f28,stroke:#9fb4ff,color:#9fb4ff
+    class P,D,V,C src
+    class N1 norm
+    class E,Z,DEC lat
+    class A,ED ctrl
+    class MG,EX out
+</pre>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><span class="legend-dot dot-ab"></span>AB prostor (absolutní, Hz/s)</div>
+    <div class="legend-item"><span class="legend-dot dot-co"></span>CO prostor (koeficienty)</div>
+    <div class="legend-item"><span class="legend-dot dot-vae"></span>Z prostor (latentní)</div>
+    <div class="legend-item"><span class="legend-dot dot-anchor"></span>Anchors (human truth)</div>
+    <div class="legend-item"><span class="legend-dot dot-flow"></span>Flow / meta</div>
+  </div>
+</section>
+
+<!-- ================== SECTION 2 : PROBLEM → SOLUTION ================== -->
+<section class="section" id="sec2">
+  <div class="section-head">
+    <div class="section-num">§ 02</div>
+    <div>
+      <h2 class="section-title">Problém <em>→</em> Řešení</h2>
+      <p class="section-lead">Tři strukturální problémy, které vedly k pěti-fázovému řešení.</p>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 2.1 · Mapping problémů na fáze řešení</span><span class="tag tag-flow">mapping</span></div>
+<pre class="mermaid">
+flowchart LR
+    subgraph PROB["✕ PROBLÉMY"]
+        direction TB
+        PR1["① Absolutní hodnoty<br/>nelze porovnávat<br/><i>C4:0.44s vs C6:0.11s</i>"]
+        PR2["② Multi-source mismatch<br/>N extraktorů, žádný<br/>mechanismus spojení"]
+        PR3["③ Chybí strukturální<br/>prostor pro editaci<br/>a interpolaci"]
+    end
+
+    subgraph SOL["✓ 5-FÁZOVÉ ŘEŠENÍ"]
+        direction TB
+        S1["Fáze 1<br/><b>Normalizace → koeficienty</b><br/>vše relativně k f0 + velocity"]
+        S2["Fáze 2<br/><b>Multi-source porovnání</b><br/>konsenzus + anomálie + confidence"]
+        S3["Fáze 3<br/><b>VAE latentní prostor</b><br/>16D reprezentace fyziky"]
+        S4["Fáze 4<br/><b>Anchors</b><br/>ručně označené 'správné' noty"]
+        S5["Fáze 5<br/><b>Interaktivní editor</b><br/>drag v 2D, real-time"]
+    end
+
+    PR1 --> S1
+    PR2 --> S2
+    PR3 --> S3
+    S3 --> S4
+    S4 --> S5
+
+    classDef prob fill:#1c1f28,stroke:#d97fbb,color:#f5f1e8
+    classDef sol fill:#1c1f28,stroke:#52d1c2,color:#f5f1e8
+    class PR1,PR2,PR3 prob
+    class S1,S2,S3,S4,S5 sol
+</pre>
+  </div>
+</section>
+
+<!-- ================== SECTION 3 : AB ↔ CO ================== -->
+<section class="section" id="sec3">
+  <div class="section-head">
+    <div class="section-num">§ 03</div>
+    <div>
+      <h2 class="section-title">Reprezentační fáze — <em>AB ↔ CO</em></h2>
+      <p class="section-lead">Dvě paralelní reprezentace, mezi kterými platí plně reverzibilní transformace. Klíčové pravidlo celé architektury.</p>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 3.1 · Dual representation s invarianty</span><span class="tag tag-ab">AB</span><span class="tag tag-co">CO</span></div>
+<pre class="mermaid">
+flowchart LR
+    subgraph AB_SP["🟡 AB — ABSOLUTNÍ PROSTOR"]
+        direction TB
+        AB1["f_hz = 261.408 Hz"]
+        AB2["tau1 = 0.4462 s"]
+        AB3["tau2 = 4.0284 s"]
+        AB4["A0 = 26.5483"]
+    end
+
+    subgraph INV["🔑 INVARIANTY<br/>(vždy drženy)"]
+        direction TB
+        I1["f0_hz<br/><i>absolutní reference</i>"]
+        I2["tau1_fund = tau1[k=1]<br/><i>decay reference</i>"]
+        I3["velocity<br/><i>vel_factor = 0.5 + v/7</i>"]
+    end
+
+    subgraph CO_SP["🔷 CO — KOEFICIENTNÍ PROSTOR"]
+        direction TB
+        CO1["f_coef = f_hz / f0_hz"]
+        CO2["tau1_coef = tau1 / tau1_fund"]
+        CO3["tau2_coef = tau2 / tau1_fund"]
+        CO4["A0_coef = A0 / A0[k=1]"]
+    end
+
+    AB_SP -- "to_coefficients(f0, tau1_fund)" --> CO_SP
+    CO_SP -- "to_partial(f0, tau1_fund)" --> AB_SP
+    INV -. drží .-> AB_SP
+    INV -. drží .-> CO_SP
+
+    classDef ab fill:#1c1f28,stroke:#e8a33d,color:#e8a33d
+    classDef co fill:#1c1f28,stroke:#52d1c2,color:#52d1c2
+    classDef inv fill:#1c1f28,stroke:#f2e05f,color:#f2e05f
+    class AB1,AB2,AB3,AB4 ab
+    class CO1,CO2,CO3,CO4 co
+    class I1,I2,I3 inv
+</pre>
+  </div>
+
+  <div class="note">
+    <strong>Proč to funguje:</strong> Všechny noty napříč MIDI i velocity dostanou v CO prostoru <em>identický tvar</em>. 
+    <code>m060_vel0</code>, <code>m060_vel7</code> i <code>m084_vel3</code> mají stejný profil <code>tau1_coef = [1.0, 0.73, 0.52, 0.38, …]</code>. 
+    To umožňuje detekci anomálií, multi-source porovnání i VAE training nad společnou geometrií.
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 3.2 · Reverzibilita jako smlouva</span><span class="tag tag-flow">invariant</span></div>
+<pre class="mermaid">
+flowchart LR
+    O["Original<br/>Partial (AB)"] -->|to_coefficients| C["PartialCoef (CO)"]
+    C -->|to_partial| R["Restored<br/>Partial (AB)"]
+    R -. "≡ tolerance 1e-6" .-> O
+
+    TEST{{"Unit test:<br/>assert round(R.f_hz,4) == round(O.f_hz,4)<br/>assert round(R.tau1,6) == round(O.tau1,6)"}}
+    R --> TEST
+
+    classDef ab fill:#1c1f28,stroke:#e8a33d,color:#e8a33d
+    classDef co fill:#1c1f28,stroke:#52d1c2,color:#52d1c2
+    classDef test fill:#0d0e12,stroke:#9fb4ff,color:#9fb4ff
+    class O,R ab
+    class C co
+    class TEST test
+</pre>
+  </div>
+</section>
+
+<!-- ================== SECTION 4 : DATA HIERARCHY ================== -->
+<section class="section" id="sec4">
+  <div class="section-head">
+    <div class="section-num">§ 04</div>
+    <div>
+      <h2 class="section-title">Datová <em>hierarchie</em></h2>
+      <p class="section-lead">Bank jako vrchol kompozice — obsahuje noty (ve vrstvách), anchors a VAE model. Každá nota má 60 partialů.</p>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 4.1 · Kompoziční strom</span><span class="tag tag-flow">hierarchy</span></div>
+<pre class="mermaid">
+flowchart TB
+    BANK["🏦 <b>BANK</b><br/>1 zdroj (Partialis / DDSP / VAE / Custom)<br/>~1000 notů"]
+
+    BANK --> META["metadata<br/>sr · instrument · source"]
+    BANK --> LAYERS["📁 Layers<br/>organizace"]
+    BANK --> ANCH["✶ Anchors[]<br/>korekční body"]
+    BANK --> VAEM["🧠 VAE Model<br/>encoder+decoder"]
+
+    LAYERS --> NOTE["🎵 <b>Note</b><br/>midi × velocity<br/>f0_hz · B · source_id"]
+
+    NOTE --> PARTS["✴ Partials[]<br/>až 60 harmonik"]
+
+    PARTS --> P["<b>Partial</b><br/>k · f_hz · A0<br/>tau1 · tau2 · a1<br/>beat_hz · phi · fit_quality"]
+
+    ANCH --> A["<b>Anchor</b><br/>midi · velocity · weight<br/>z ∈ ℝ¹⁶ · sources · confidence"]
+
+    classDef root fill:#1c1f28,stroke:#9fb4ff,color:#9fb4ff
+    classDef layer fill:#14161c,stroke:#8b8679,color:#f5f1e8
+    classDef ab fill:#14161c,stroke:#e8a33d,color:#e8a33d
+    classDef anchor fill:#14161c,stroke:#f2e05f,color:#f2e05f
+    classDef vae fill:#14161c,stroke:#d97fbb,color:#d97fbb
+    class BANK root
+    class META,LAYERS layer
+    class NOTE,PARTS,P ab
+    class ANCH,A anchor
+    class VAEM vae
+</pre>
+  </div>
+</section>
+
+<!-- ================== SECTION 5 : CLASS DIAGRAM ================== -->
+<section class="section" id="sec5">
+  <div class="section-head">
+    <div class="section-num">§ 05</div>
+    <div>
+      <h2 class="section-title">Třídy <em>a vztahy</em></h2>
+      <p class="section-lead">Každá doménová třída existuje ve dvou formách (AB + CO), propojených metodami <code>to_coefficients()</code> a <code>to_note()</code>.</p>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 5.1 · Core class diagram</span><span class="tag tag-flow">UML</span></div>
+<pre class="mermaid">
+classDiagram
+    direction LR
+
+    class Partial {
+        +int k
+        +float f_hz
+        +float A0
+        +float tau1
+        +float tau2
+        +float a1
+        +float beat_hz
+        +float phi
+        +float fit_quality
+        +to_coefficients(f0, tau1_fund) PartialCoef
+        +to_dict() dict
+    }
+
+    class PartialCoef {
+        +int k
+        +float f_coef
+        +float tau1_coef
+        +float tau2_coef
+        +float A0_coef
+        +float a1
+        +float beat_hz_coef
+        +to_partial(f0, tau1_fund) Partial
+    }
+
+    class Note {
+        +int midi
+        +int velocity
+        +float f0_hz
+        +float B
+        +List~Partial~ partials
+        +str source
+        +to_coefficients() NoteCoef
+    }
+
+    class NoteCoef {
+        +int midi
+        +int velocity
+        +float f0_hz
+        +List~PartialCoef~ partials
+        +to_note() Note
+    }
+
+    class Bank {
+        +str id
+        +str name
+        +str source
+        +List~Note~ notes
+        +List~Layer~ layers
+        +List~Anchor~ anchors
+        +dict metadata
+        +to_coefficients() BankCoef
+        +add_note(note) void
+        +copy_note(id, new_midi) Note
+    }
+
+    class Anchor {
+        +str id
+        +int midi
+        +int velocity
+        +int weight
+        +ndarray z
+        +List~str~ sources
+        +float confidence
+        +str comment
+    }
+
+    class Layer {
+        +str id
+        +str name
+        +List~Note~ notes
+    }
+
+    Bank "1" *-- "many" Note
+    Bank "1" *-- "many" Layer
+    Bank "1" *-- "many" Anchor
+    Layer "1" o-- "many" Note
+    Note "1" *-- "many" Partial
+    Note ..> NoteCoef : to_coefficients
+    NoteCoef ..> Note : to_note
+    Partial ..> PartialCoef : to_coefficients
+    PartialCoef ..> Partial : to_partial
+</pre>
+  </div>
+</section>
+
+<!-- ================== SECTION 6 : VAE ================== -->
+<section class="section" id="sec6">
+  <div class="section-head">
+    <div class="section-num">§ 06</div>
+    <div>
+      <h2 class="section-title">VAE <em>architektura</em></h2>
+      <p class="section-lead">Encoder komprimuje 480-rozměrný vektor koeficientů do 16D latentního prostoru, decoder rekonstruuje. Loss kombinuje rekonstrukci, KL-divergenci a korekce od anchorů.</p>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 6.1 · Encoder → Latent → Decoder</span><span class="tag tag-vae">VAE</span></div>
+<pre class="mermaid">
+flowchart LR
+    IN["<b>INPUT</b><br/>60 partials × 8 koef.<br/>= 480 dims"]
+
+    subgraph ENC["🔻 ENCODER"]
+        direction TB
+        E1["Dense 480"]
+        E2["Dense 256"]
+        E3["Dense 64"]
+        E1 --> E2 --> E3
+    end
+
+    subgraph LATENT["🎯 LATENT SPACE<br/>z ∈ ℝ¹⁶"]
+        direction TB
+        MU["μ (mean)<br/>Dense 16"]
+        SIG["log σ² (variance)<br/>Dense 16"]
+        Z["<b>z ~ N(μ, σ²)</b>"]
+        MU --> Z
+        SIG --> Z
+    end
+
+    subgraph DEC["🔺 DECODER"]
+        direction TB
+        D1["Dense 16"]
+        D2["Dense 64"]
+        D3["Dense 256"]
+        D4["Dense 480"]
+        D1 --> D2 --> D3 --> D4
+    end
+
+    OUT["<b>OUTPUT</b><br/>rekonstruované<br/>koeficienty"]
+
+    IN --> E1
+    E3 --> MU
+    E3 --> SIG
+    Z --> D1
+    D4 --> OUT
+
+    classDef io fill:#1c1f28,stroke:#52d1c2,color:#52d1c2
+    classDef enc fill:#14161c,stroke:#d97fbb,color:#f5f1e8
+    classDef lat fill:#1c1f28,stroke:#d97fbb,color:#d97fbb
+    classDef dec fill:#14161c,stroke:#d97fbb,color:#f5f1e8
+    class IN,OUT io
+    class E1,E2,E3 enc
+    class MU,SIG,Z lat
+    class D1,D2,D3,D4 dec
+</pre>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 6.2 · Loss funkce — tři komponenty</span><span class="tag tag-vae">loss</span></div>
+<pre class="mermaid">
+flowchart TB
+    subgraph LOSS["<b>L_total = L_recon + β · L_KL + λ · L_anchor</b>"]
+        direction LR
+
+        subgraph RECON["① Rekonstrukce"]
+            R1["target = weighted consensus<br/>(Partialis · w1 + DDSP · w2 + …)"]
+            R2["L_recon = MSE(output, target)"]
+            R1 --> R2
+        end
+
+        subgraph KL["② KL divergence"]
+            K1["prior: N(0, I)"]
+            K2["L_KL = KL(N(μ,σ²) ‖ N(0,I))<br/>drží latent prostor gaussian"]
+            K1 --> K2
+        end
+
+        subgraph ANC["③ Anchor correction"]
+            A1["Σ weight · dist(z_pred, z_anchor)"]
+            A2["L_anchor = přitahuje noty<br/>k ručně označeným bodům"]
+            A1 --> A2
+        end
+    end
+
+    classDef loss fill:#1c1f28,stroke:#9fb4ff,color:#9fb4ff
+    classDef recon fill:#14161c,stroke:#52d1c2,color:#f5f1e8
+    classDef kl fill:#14161c,stroke:#d97fbb,color:#f5f1e8
+    classDef anc fill:#14161c,stroke:#f2e05f,color:#f5f1e8
+    class R1,R2 recon
+    class K1,K2 kl
+    class A1,A2 anc
+</pre>
+  </div>
+</section>
+
+<!-- ================== SECTION 7 : LATENT SPACE USAGE ================== -->
+<section class="section" id="sec7">
+  <div class="section-head">
+    <div class="section-num">§ 07</div>
+    <div>
+      <h2 class="section-title">Latentní <em>prostor</em> — využití</h2>
+      <p class="section-lead">16D vektor z je kompaktní, kontinuální a fyzicky interpretovatelný. Tři hlavní operace: KNN hledání, interpolace a rekonstrukce.</p>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 7.1 · Interpretace dimenzí a operace</span><span class="tag tag-vae">latent ops</span></div>
+<pre class="mermaid">
+flowchart LR
+    subgraph Z_VEC["🎯 z ∈ ℝ¹⁶"]
+        direction TB
+        Z0["dim 0 · f₀ stability"]
+        Z1["dim 1 · τ₁ decay profile"]
+        Z2["dim 2 · τ₂/τ₁ ratio"]
+        Z3["dim 3 · spectral centroid"]
+        Z4["dim 4 · inharmonicity"]
+        Z5["dim 5 · amplitude shape"]
+        Z6["dim 6 · decay variation"]
+        Z7["dim 7…15 · ostatní"]
+    end
+
+    subgraph OPS["OPERACE"]
+        direction TB
+        O1["🔍 <b>KNN</b><br/>find_nearest(z, k=5)"]
+        O2["🌀 <b>Interpolace</b><br/>lerp(z₁, z₂, steps)"]
+        O3["🔁 <b>Rekonstrukce</b><br/>decoder(z) → coef"]
+        O4["📊 <b>Confidence</b><br/>exp(-dist_to_anchor/σ)"]
+    end
+
+    Z_VEC --> O1
+    Z_VEC --> O2
+    Z_VEC --> O3
+    Z_VEC --> O4
+
+    classDef z fill:#14161c,stroke:#d97fbb,color:#f5f1e8
+    classDef op fill:#1c1f28,stroke:#52d1c2,color:#52d1c2
+    class Z0,Z1,Z2,Z3,Z4,Z5,Z6,Z7 z
+    class O1,O2,O3,O4 op
+</pre>
+  </div>
+</section>
+
+<!-- ================== SECTION 8 : ANCHORS ================== -->
+<section class="section" id="sec8">
+  <div class="section-head">
+    <div class="section-num">§ 08</div>
+    <div>
+      <h2 class="section-title">Anchors <em>systém</em></h2>
+      <p class="section-lead">Ručně označený bod v latentním prostoru = "tato nota je správná". Má váhu 1–9, slouží k interpolaci, corrective loss a confidence scoring.</p>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 8.1 · Tři role anchorů</span><span class="tag tag-anchor">anchors</span></div>
+<pre class="mermaid">
+flowchart TB
+    subgraph CREATE["CREATE"]
+        C1["Editor označí notu<br/>s consensus mezi<br/>Partialis + DDSP"]
+        C2["POST /api/anchors<br/>{midi, vel, weight, z, sources}"]
+        C1 --> C2
+    end
+
+    ANCHOR["✶ <b>ANCHOR</b><br/>midi · velocity · weight 1-9<br/>z ∈ ℝ¹⁶ · confidence · sources"]
+
+    C2 --> ANCHOR
+
+    subgraph USE1["① KNN interpolace"]
+        U1A["nota bez anchoru"]
+        U1B["najdi K nejbližších<br/>anchorů v z-prostoru"]
+        U1C["weighted_average(z)<br/>→ doplň chybějící notu"]
+        U1A --> U1B --> U1C
+    end
+
+    subgraph USE2["② Corrective loss (VAE)"]
+        U2A["training step"]
+        U2B["L_anchor = Σ weight ·<br/>dist(z_pred, z_anchor)"]
+        U2C["gradient přitahuje<br/>k anchorům"]
+        U2A --> U2B --> U2C
+    end
+
+    subgraph USE3["③ Confidence scoring"]
+        U3A["pro každou notu"]
+        U3B["dist_to_nearest_anchor"]
+        U3C["conf = exp(-dist/σ)<br/>→ heatmapa jistoty"]
+        U3A --> U3B --> U3C
+    end
+
+    ANCHOR --> USE1
+    ANCHOR --> USE2
+    ANCHOR --> USE3
+
+    classDef create fill:#14161c,stroke:#8b8679,color:#f5f1e8
+    classDef anchor fill:#1c1f28,stroke:#f2e05f,color:#f2e05f
+    classDef use fill:#14161c,stroke:#52d1c2,color:#f5f1e8
+    class C1,C2 create
+    class ANCHOR anchor
+    class U1A,U1B,U1C,U2A,U2B,U2C,U3A,U3B,U3C use
+</pre>
+  </div>
+</section>
+
+<!-- ================== SECTION 9 : FASTAPI DOMAINS ================== -->
+<section class="section" id="sec9">
+  <div class="section-head">
+    <div class="section-num">§ 09</div>
+    <div>
+      <h2 class="section-title">FastAPI <em>domény</em></h2>
+      <p class="section-lead">Sedm logických skupin endpointů, od základních bank operací po VAE a merge. Každá doména řeší jeden typ operací.</p>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 9.1 · REST API — přehled domén</span><span class="tag tag-flow">API</span></div>
+<pre class="mermaid">
+flowchart TB
+    API["🌐 <b>FastAPI Backend</b><br/>uvicorn :8000"]
+
+    subgraph D1["① BANK /api/bank"]
+        direction TB
+        D1A["POST · load bank"]
+        D1B["GET · read bank"]
+        D1C["GET /note/{midi}/{vel}"]
+        D1D["POST /copy-note"]
+    end
+
+    subgraph D2["② COEF /api/coef"]
+        direction TB
+        D2A["GET /note/{midi}/{vel}"]
+        D2B["GET /compare"]
+    end
+
+    subgraph D3["③ LATENT /api/latent"]
+        direction TB
+        D3A["GET /note — z vektor"]
+        D3B["GET /nearest · KNN"]
+        D3C["POST /interpolate"]
+        D3D["POST /reconstruct"]
+        D3E["GET /health"]
+    end
+
+    subgraph D4["④ ANCHORS /api/anchors"]
+        direction TB
+        D4A["POST · create"]
+        D4B["GET · list"]
+        D4C["PATCH · update"]
+        D4D["DELETE"]
+    end
+
+    subgraph D5["⑤ MERGE /api/merge"]
+        direction TB
+        D5A["POST · multi-bank merge<br/>weights + anchors + VAE"]
+    end
+
+    subgraph D6["⑥ EXPORT /api/bank/{id}/export"]
+        direction TB
+        D6A["GET · JSON"]
+        D6B["GET · with_anchors<br/>+ latents + confidence"]
+    end
+
+    subgraph D7["⑦ STATS /api/bank/{id}/stats"]
+        direction TB
+        D7A["GET · bank stats"]
+        D7B["GET · VAE health"]
+    end
+
+    API --> D1
+    API --> D2
+    API --> D3
+    API --> D4
+    API --> D5
+    API --> D6
+    API --> D7
+
+    classDef api fill:#1c1f28,stroke:#9fb4ff,color:#9fb4ff
+    classDef ab fill:#14161c,stroke:#e8a33d,color:#e8a33d
+    classDef co fill:#14161c,stroke:#52d1c2,color:#52d1c2
+    classDef vae fill:#14161c,stroke:#d97fbb,color:#d97fbb
+    classDef anch fill:#14161c,stroke:#f2e05f,color:#f2e05f
+    classDef neutral fill:#14161c,stroke:#8b8679,color:#f5f1e8
+    class API api
+    class D1,D1A,D1B,D1C,D1D ab
+    class D2,D2A,D2B co
+    class D3,D3A,D3B,D3C,D3D,D3E vae
+    class D4,D4A,D4B,D4C,D4D anch
+    class D5,D5A,D6,D6A,D6B,D7,D7A,D7B neutral
+</pre>
+  </div>
+</section>
+
+<!-- ================== SECTION 10 : USE CASES ================== -->
+<section class="section" id="sec10">
+  <div class="section-head">
+    <div class="section-num">§ 10</div>
+    <div>
+      <h2 class="section-title">Use cases — <em>tok dat</em></h2>
+      <p class="section-lead">Čtyři hlavní scénáře jako sequenční diagramy — jak frontend a backend spolupracují v reálných situacích.</p>
+    </div>
+  </div>
+
+  <h3 class="sub-head">UC1 · Load & Compare Multiple Banks</h3>
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 10.1 · Porovnání N extraktů</span><span class="tag tag-flow">UC1</span></div>
+<pre class="mermaid">
+sequenceDiagram
+    participant U as 👤 User
+    participant FE as 💻 Frontend
+    participant API as ⚙️ FastAPI
+    participant CORE as 📦 piano_core
+
+    U->>FE: drop 3 JSON (Partialis, DDSP, VAE)
+    FE->>API: POST /api/bank × 3
+    API->>CORE: Bank.from_dict() × 3
+    CORE-->>API: bank_001, bank_002, bank_003
+    API-->>FE: bank_ids + stats
+
+    U->>FE: vyber C4 vel=5
+    FE->>API: GET /api/coef/compare?bank_ids=…&midi=60&vel=5
+    API->>CORE: normalizace + variance + consensus
+    CORE-->>API: 3× coef + variance[k] + consensus[k]
+    API-->>FE: comparison JSON
+
+    FE->>U: 3 překrývající se grafy<br/>+ highlight anomálií
+</pre>
+  </div>
+
+  <h3 class="sub-head">UC2 · Set Anchors from Consensus</h3>
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 10.2 · Vytvoření anchoru z konsenzu</span><span class="tag tag-anchor">UC2</span></div>
+<pre class="mermaid">
+sequenceDiagram
+    participant U as 👤 User
+    participant FE as 💻 Frontend
+    participant API as ⚙️ FastAPI
+    participant VAE as 🧠 VAE
+
+    U->>FE: "Anchor z Partialis + DDSP"
+    FE->>API: GET /api/coef/compare?bank_ids=b1,b2&midi=60&vel=5
+    API-->>FE: coef1, coef2
+
+    FE->>FE: avg(coef1, coef2)
+    FE->>API: encode(avg_coef)
+    API->>VAE: VAE.encode()
+    VAE-->>API: consensus_z ∈ ℝ¹⁶
+
+    FE->>API: POST /api/anchors<br/>{midi:60, vel:5, weight:8, z:consensus_z}
+    API-->>FE: anchor_id
+    FE->>U: ★ marker na grafu
+</pre>
+  </div>
+
+  <h3 class="sub-head">UC3 · Interpolate Missing Notes</h3>
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 10.3 · Doplnění chybějících velocity vrstev</span><span class="tag tag-vae">UC3</span></div>
+<pre class="mermaid">
+sequenceDiagram
+    participant U as 👤 User
+    participant FE as 💻 Frontend
+    participant API as ⚙️ FastAPI
+
+    U->>FE: "Vyplň velocity 1-6 pro C4"
+    FE->>API: GET /api/latent/bank_001/note/60/0
+    API-->>FE: z₀ (vel=0)
+    FE->>API: GET /api/latent/bank_001/note/60/7
+    API-->>FE: z₇ (vel=7)
+
+    FE->>API: POST /api/latent/interpolate<br/>{z1:z₀, z2:z₇, steps:7}
+    API-->>FE: [z₁, z₂, z₃, z₄, z₅, z₆]
+
+    loop pro každý interp. z
+        FE->>API: POST /api/latent/reconstruct
+        API-->>FE: coef → denormalizace → Note (AB)
+    end
+
+    FE->>U: vyplněné vrstvy v editoru
+</pre>
+  </div>
+
+  <h3 class="sub-head">UC4 · Merge & Export</h3>
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 10.4 · Konsolidace do ground-truth datasetu</span><span class="tag tag-flow">UC4</span></div>
+<pre class="mermaid">
+sequenceDiagram
+    participant U as 👤 User
+    participant FE as 💻 Frontend
+    participant API as ⚙️ FastAPI
+    participant VAE as 🧠 VAE
+
+    U->>FE: "Merge všech 3 bank"
+    FE->>API: POST /api/merge<br/>{bank_ids, weights, use_anchors:true}
+
+    API->>API: 1) sběr notů ze všech bank
+    API->>API: 2) normalizace → CO
+    API->>API: 3) weighted average
+    API->>VAE: 4) VAE.reconstruct (smooth)
+    VAE-->>API: smoothed coef
+    API->>API: 5) CO → AB (denormalizace)
+    API->>API: 6) compute confidence per note
+
+    API-->>FE: merged_bank_id + confidence_map
+
+    U->>FE: "Export"
+    FE->>API: GET /api/bank/merged_001/export?include_anchors=true
+    API-->>FE: JSON
+    FE->>U: ↓ merged_piano.json
+</pre>
+  </div>
+</section>
+
+<!-- ================== SECTION 11 : FRONTEND ================== -->
+<section class="section" id="sec11">
+  <div class="section-head">
+    <div class="section-num">§ 11</div>
+    <div>
+      <h2 class="section-title">Frontend <em>architektura</em></h2>
+      <p class="section-lead">Electron + React + Three.js — nativní macOS aplikace s 3D visualizací latentního prostoru.</p>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 11.1 · Komponentová struktura</span><span class="tag tag-flow">frontend</span></div>
+<pre class="mermaid">
+flowchart TB
+    ELEC["🖥️ <b>Electron App</b><br/>native macOS"]
+    ELEC --> REACT["⚛️ React 19 + TypeScript"]
+
+    REACT --> UI["📋 Editor UI<br/>(Zustand state)"]
+    REACT --> VIEW["🎲 3D Viewport<br/>(Three.js)"]
+
+    UI --> BS["Bank Selector<br/>vyber N bank"]
+    UI --> LT["Layer Tree"]
+    UI --> MS["MIDI Slider<br/>21-108"]
+    UI --> VS["Velocity Slider<br/>0-7"]
+    UI --> PS["Parameter Selector<br/>tau1_coef · A0_coef · …"]
+    UI --> CM["Compare Mode<br/>3 banky vedle sebe"]
+    UI --> AE["Anchor Editor<br/>klik → anchor"]
+    UI --> PP["Properties Panel"]
+    UI --> EX["Export Button"]
+
+    VIEW --> V1["2D scatter<br/>log(f/f0) vs param"]
+    VIEW --> V2["3D latent space<br/>PCA projekce"]
+    VIEW --> V3["Confidence heatmap"]
+
+    REACT -. HTTP/WebSocket .-> API["⚙️ FastAPI :8000"]
+
+    classDef elec fill:#1c1f28,stroke:#9fb4ff,color:#9fb4ff
+    classDef ui fill:#14161c,stroke:#52d1c2,color:#f5f1e8
+    classDef view fill:#14161c,stroke:#d97fbb,color:#f5f1e8
+    classDef api fill:#1c1f28,stroke:#e8a33d,color:#e8a33d
+    class ELEC,REACT elec
+    class UI,BS,LT,MS,VS,PS,CM,AE,PP,EX ui
+    class VIEW,V1,V2,V3 view
+    class API api
+</pre>
+  </div>
+</section>
+
+<!-- ================== SECTION 12 : ROADMAP ================== -->
+<section class="section" id="sec12">
+  <div class="section-head">
+    <div class="section-num">§ 12</div>
+    <div>
+      <h2 class="section-title">Roadmap — <em>stavebnice</em></h2>
+      <p class="section-lead">Šest nezávislých stages, každý je plug-and-play. Validace po každé etapě před postupem.</p>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 12.1 · Timeline stages 1-6</span><span class="tag tag-flow">roadmap</span></div>
+<pre class="mermaid">
+flowchart LR
+    S1["<b>Stage 1</b><br/>📐 Core Classes<br/>Partial · Note · Anchor<br/><i>AB↔CO reverzibilita</i><br/>✅ Unit tests<br/>🗓 Week 1-2"]
+    S2["<b>Stage 2</b><br/>💾 I/O<br/>load/save ICR JSON<br/><i>validace importu</i><br/>✅ Round-trip test<br/>🗓 Week 2"]
+    S3["<b>Stage 3</b><br/>🔧 Corrections<br/>copy decay profile<br/>fill fundamentals<br/><i>KNN interpolace</i><br/>🗓 Week 3"]
+    S4["<b>Stage 4</b><br/>🏦 Bank ops<br/>batch corrections<br/>confidence mapping<br/><i>1000 notů &lt; 1s</i><br/>🗓 Week 3"]
+    S5["<b>Stage 5</b><br/>🌐 FastAPI<br/>REST endpoints<br/><i>Swagger UI</i><br/>🗓 Week 4"]
+    S6["<b>Stage 6</b><br/>⚛️ Frontend<br/>React + Three.js<br/><i>E2E testy</i><br/>🗓 Week 5"]
+
+    S1 --> S2 --> S3 --> S4 --> S5 --> S6
+
+    S1 -.-> T1["test_models.py"]
+    S2 -.-> T2["test_io.py"]
+    S3 -.-> T3["test_corrections.py"]
+    S4 -.-> T4["test_bank_ops.py"]
+    S5 -.-> T5["test_api.py"]
+    S6 -.-> T6["e2e.cypress"]
+
+    classDef core fill:#1c1f28,stroke:#e8a33d,color:#e8a33d
+    classDef io fill:#1c1f28,stroke:#52d1c2,color:#52d1c2
+    classDef logic fill:#1c1f28,stroke:#d97fbb,color:#d97fbb
+    classDef api fill:#1c1f28,stroke:#f2e05f,color:#f2e05f
+    classDef ui fill:#1c1f28,stroke:#9fb4ff,color:#9fb4ff
+    classDef test fill:#0d0e12,stroke:#8b8679,color:#8b8679
+
+    class S1 core
+    class S2 io
+    class S3,S4 logic
+    class S5 api
+    class S6 ui
+    class T1,T2,T3,T4,T5,T6 test
+</pre>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. 12.2 · Phase mapping — MVP → Future</span><span class="tag tag-flow">phases</span></div>
+<pre class="mermaid">
+flowchart TB
+    subgraph P1["📦 PHASE 1 · MVP (W1-4)"]
+        direction LR
+        P1A[Stage 1]
+        P1B[Stage 2]
+        P1C[Stage 3]
+        P1D[Stage 4]
+        P1E[Stage 5]
+    end
+
+    subgraph P2["🚀 PHASE 2 · Extended (W5-8)"]
+        direction LR
+        P2A[Stage 6<br/>Frontend]
+        P2B[VAE training]
+        P2C[Anchors UI]
+        P2D[Multi-bank merge]
+    end
+
+    subgraph P3["🔮 PHASE 3+ · Future"]
+        direction LR
+        P3A[WebSocket sync]
+        P3B[PostgreSQL]
+        P3C[Audio synth preview]
+        P3D[Collaborative edit]
+    end
+
+    P1 --> P2 --> P3
+
+    classDef mvp fill:#1c1f28,stroke:#52d1c2,color:#52d1c2
+    classDef ext fill:#1c1f28,stroke:#d97fbb,color:#d97fbb
+    classDef fut fill:#1c1f28,stroke:#8b8679,color:#8b8679
+    class P1A,P1B,P1C,P1D,P1E mvp
+    class P2A,P2B,P2C,P2D ext
+    class P3A,P3B,P3C,P3D fut
+</pre>
+  </div>
+</section>
+
+<!-- ================== INVARIANTS ================== -->
+<div class="divider"></div>
+<section class="section" id="invariants">
+  <div class="section-head">
+    <div class="section-num">§ ★</div>
+    <div>
+      <h2 class="section-title">Kritické <em>invarianty</em></h2>
+      <p class="section-lead">Pravidla, která nelze porušit. Porušení = nekonzistentní dataset.</p>
+    </div>
+  </div>
+
+  <div class="diagram">
+    <div class="diagram-label"><span>Obr. ★ · Invariant check matrix</span><span class="tag tag-flow">rules</span></div>
+<pre class="mermaid">
+flowchart LR
+    subgraph MUST["🔴 NESMÍŠ MĚNIT"]
+        direction TB
+        M1["f0_hz vždy absolutní"]
+        M2["tau1_fund = tau1[k=1]"]
+        M3["MIDI ∈ [0, 127]"]
+        M4["velocity ∈ [0, 7]"]
+        M5["Reverzibilita AB↔CO"]
+        M6["Partials monotonní k"]
+        M7["VAE z gaussian prior"]
+    end
+
+    subgraph CAN["🟢 MŮŽEŠ MĚNIT"]
+        direction TB
+        C1["Počet velocity vrstev"]
+        C2["Počet partialů"]
+        C3["Latentní dimenzionalita (8-32)"]
+        C4["Storage backend"]
+        C5["Frontend framework"]
+        C6["3D library"]
+        C7["Deployment"]
+    end
+
+    classDef must fill:#1c1f28,stroke:#d97fbb,color:#f5f1e8
+    classDef can fill:#1c1f28,stroke:#52d1c2,color:#f5f1e8
+    class M1,M2,M3,M4,M5,M6,M7 must
+    class C1,C2,C3,C4,C5,C6,C7 can
+</pre>
+  </div>
+</section>
+
+<!-- ================== FOOTER ================== -->
+<footer class="footer">
+  <span>Piano Spectral Editor · v0.2</span>
+  <span>Vizuální specifikace · 12 sekcí · 20+ diagramů</span>
+  <span>Ready to code 🚀</span>
+</footer>
+
+</div>
+
+<script>
+mermaid.initialize({
+  startOnLoad: true,
+  theme: 'base',
+  themeVariables: {
+    background: 'transparent',
+    primaryColor: '#1c1f28',
+    primaryTextColor: '#f5f1e8',
+    primaryBorderColor: '#52d1c2',
+    lineColor: '#8b8679',
+    secondaryColor: '#14161c',
+    tertiaryColor: '#0d0e12',
+    mainBkg: '#1c1f28',
+    nodeBkg: '#1c1f28',
+    clusterBkg: '#0d0e12',
+    clusterBorder: '#2a2d37',
+    defaultLinkColor: '#8b8679',
+    titleColor: '#f5f1e8',
+    edgeLabelBackground: '#0d0e12',
+    textColor: '#f5f1e8',
+    fontFamily: 'IBM Plex Mono, monospace',
+    fontSize: '13px',
+    /* sequence */
+    actorBkg: '#1c1f28',
+    actorBorder: '#52d1c2',
+    actorTextColor: '#f5f1e8',
+    actorLineColor: '#52d1c2',
+    signalColor: '#f5f1e8',
+    signalTextColor: '#f5f1e8',
+    labelBoxBkgColor: '#1c1f28',
+    labelBoxBorderColor: '#9fb4ff',
+    labelTextColor: '#f5f1e8',
+    loopTextColor: '#f5f1e8',
+    noteBkgColor: '#14161c',
+    noteTextColor: '#e8a33d',
+    noteBorderColor: '#e8a33d',
+    activationBkgColor: '#1c1f28',
+    activationBorderColor: '#52d1c2',
+    /* class */
+    classText: '#f5f1e8'
+  },
+  flowchart: {
+    curve: 'basis',
+    padding: 20,
+    useMaxWidth: true,
+    htmlLabels: true
+  },
+  sequence: {
+    actorMargin: 60,
+    boxMargin: 12,
+    messageMargin: 35,
+    useMaxWidth: true
+  },
+  classDiagram: {
+    useMaxWidth: true
+  }
+});
+</script>
+
+</body>
+</html>

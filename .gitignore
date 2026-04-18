@@ -1,5 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+*.egg
+
+# Node
 node_modules/
 dist/
+*.tsbuildinfo
+
+# SQLite dev DB
+data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Runtime
+logs/
 .env
 .env.*
 *.local
+
+# IDE
+.idea/
+.vscode/
+.claude/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
