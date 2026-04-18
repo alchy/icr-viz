@@ -38,6 +38,7 @@ from ..schemas import (
     AnchorInterpolateResponse,
     ParameterCurveDiag,
 )
+from ..workers import run_in_pool
 
 
 logger = logging.getLogger(__name__)
@@ -69,55 +70,30 @@ async def anchor_interpolate_endpoint(
     if bank is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"bank {bank_id!r} not found")
 
-    per_parameter: list[ParameterCurveDiag] = []
-    partials_update_plan: dict[tuple[int, int], dict[int, dict[str, float]]] = {}
-
+    # Validate target notes up-front — fail fast before we pay pool overhead.
     for (midi, velocity) in params.target_note_ids:
-        note = bank.get_note(midi, velocity)
-        if note is None:
+        if bank.get_note(midi, velocity) is None:
             raise HTTPException(
                 status.HTTP_404_NOT_FOUND,
                 f"note ({midi}, {velocity}) not in bank {bank_id!r}",
             )
-        note_anchors = bank.anchors_for_note(midi, velocity)
-        anchor_obs = [
-            AnchorObservation(
-                k=a.k, parameter=a.parameter, value=a.value,
-                weight=a.weight, sigma=None,
-            )
-            for a in note_anchors
-        ]
 
-        # k range: explicit override, else defaults to note's partial coverage
-        if params.k_range is not None:
-            k_range = (int(params.k_range[0]), int(params.k_range[1]))
-        else:
-            ks = [p.k for p in note.partials]
-            if ks:
-                k_range = (min(ks), max(ks))
-            else:
-                # Without partials, default to a conservative range
-                k_range = (1, 60)
-
-        for parameter in params.parameters:
-            result = anchor_interpolate(
-                partials=note.partials,
-                anchors=anchor_obs,
-                parameter=parameter,
-                prior_weight=params.prior_weight,
-                smoothing=params.smoothing,
-                random_seed=params.random_seed,
-                k_range=k_range,
-            )
-            diag = _result_to_curve_diag(
-                result, midi=midi, velocity=velocity, parameter=parameter,
-            )
-            per_parameter.append(diag)
-
-            if params.commit:
-                _record_curve_update(
-                    partials_update_plan, midi, velocity, result, parameter,
-                )
+    # Offload the scipy-heavy loop to the ProcessPool so concurrent endpoints
+    # stay responsive. Passing `bank` (frozen dataclass) is cheap to pickle.
+    per_parameter, partials_update_plan = await run_in_pool(
+        _compute_anchor_interpolate_batch,
+        bank=bank,
+        target_note_ids=list(params.target_note_ids),
+        parameters=list(params.parameters),
+        prior_weight=params.prior_weight,
+        smoothing=params.smoothing,
+        random_seed=params.random_seed,
+        k_range_override=(
+            (int(params.k_range[0]), int(params.k_range[1]))
+            if params.k_range is not None else None
+        ),
+        commit=params.commit,
+    )
 
     new_bank_id = None
     parent_id = None
@@ -143,6 +119,70 @@ async def anchor_interpolate_endpoint(
         parent_id=parent_id,
         per_parameter=per_parameter,
     )
+
+
+# ---------------------------------------------------------------------------
+# ProcessPool worker — top-level so it pickles cleanly (Windows spawn).
+# ---------------------------------------------------------------------------
+
+def _compute_anchor_interpolate_batch(
+    *,
+    bank: Bank,
+    target_note_ids: list[tuple[int, int]],
+    parameters: list[str],
+    prior_weight: float,
+    smoothing: str | float | None,
+    random_seed: int,
+    k_range_override: tuple[int, int] | None,
+    commit: bool,
+) -> tuple[list[ParameterCurveDiag], dict[tuple[int, int], dict[int, dict[str, float]]]]:
+    """Run anchor_interpolate for every (note, parameter) pair in the batch.
+
+    Returns `(per_parameter_diags, partials_update_plan)`. Executed inside the
+    ProcessPool — must be picklable and free of FastAPI state.
+    """
+    per_parameter: list[ParameterCurveDiag] = []
+    partials_update_plan: dict[tuple[int, int], dict[int, dict[str, float]]] = {}
+
+    for (midi, velocity) in target_note_ids:
+        note = bank.get_note(midi, velocity)
+        if note is None:
+            # Should have been caught on the async side, but be defensive.
+            continue
+        note_anchors = bank.anchors_for_note(midi, velocity)
+        anchor_obs = [
+            AnchorObservation(
+                k=a.k, parameter=a.parameter, value=a.value,
+                weight=a.weight, sigma=None,
+            )
+            for a in note_anchors
+        ]
+
+        if k_range_override is not None:
+            k_range = k_range_override
+        else:
+            ks = [p.k for p in note.partials]
+            k_range = (min(ks), max(ks)) if ks else (1, 60)
+
+        for parameter in parameters:
+            result = anchor_interpolate(
+                partials=note.partials,
+                anchors=anchor_obs,
+                parameter=parameter,
+                prior_weight=prior_weight,
+                smoothing=smoothing,
+                random_seed=random_seed,
+                k_range=k_range,
+            )
+            per_parameter.append(_result_to_curve_diag(
+                result, midi=midi, velocity=velocity, parameter=parameter,
+            ))
+            if commit:
+                _record_curve_update(
+                    partials_update_plan, midi, velocity, result, parameter,
+                )
+
+    return per_parameter, partials_update_plan
 
 
 # ---------------------------------------------------------------------------

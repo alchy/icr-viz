@@ -21,6 +21,7 @@ from piano_core.operators.tone_identify_and_correct import (
 
 from ..dependencies import get_repository
 from ..repository import BankRepository
+from ..workers import run_in_pool
 from ..schemas import (
     DeviationEntryOut,
     DeviationReportResponse,
@@ -262,7 +263,10 @@ async def deviation_report_endpoint(
             ) from exc
 
     target_note_by_key = {n.id: n for n in target.notes}
-    report = deviation_report(
+    # Offload to ProcessPool — the inner loop runs 100s of scipy fits and would
+    # otherwise wedge the event loop for minutes on large banks.
+    report = await run_in_pool(
+        deviation_report,
         target_bank_id=target.id,
         target_notes=target_note_by_key,
         references=reference_samples,

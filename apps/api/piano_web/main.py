@@ -44,6 +44,22 @@ async def lifespan(app: FastAPI):
     await init_schema()
     logger.info("app.startup")
     yield
+    # Stop child ICR engine on shutdown so the wrapper's Ctrl+C doesn't
+    # leak an orphaned icr.exe / icrgui.exe process.
+    try:
+        from .routers.icr import get_process
+        st = get_process().stop()
+        if st.return_code is not None or st.pid is None:
+            logger.info("app.shutdown.icr_stopped", extra={"return_code": st.return_code})
+    except Exception as exc:
+        logger.warning("app.shutdown.icr_stop_failed", extra={"detail": str(exc)})
+    # Tear down the CPU-bound worker pool so queued scipy work is cancelled
+    # and the process exits promptly.
+    try:
+        from .workers import shutdown_pool
+        shutdown_pool()
+    except Exception as exc:
+        logger.warning("app.shutdown.pool_failed", extra={"detail": str(exc)})
     logger.info("app.shutdown")
 
 

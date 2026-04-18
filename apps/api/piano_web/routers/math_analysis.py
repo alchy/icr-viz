@@ -32,6 +32,7 @@ from piano_core.analysis import (
 
 from ..dependencies import get_repository
 from ..repository import BankRepository
+from ..workers import run_in_pool
 
 
 logger = logging.getLogger(__name__)
@@ -97,7 +98,8 @@ async def math_analysis_endpoint(
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"bank {bank_id!r} not found")
 
     t0 = time.perf_counter()
-    report = analyze_bank(bank)
+    # Offload to ProcessPool so ~100-note banks don't wedge the event loop.
+    report = await run_in_pool(analyze_bank, bank)
     _cache_put(bank_id, report)
     logger.info(
         "api.math_analysis.generated",

@@ -9,7 +9,6 @@ forming an immutable chain that supports deterministic replay (i5).
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from types import MappingProxyType
 from typing import Any, Mapping
 
 from .anchor import Anchor
@@ -22,9 +21,10 @@ class Bank:
 
     id: str                                       # "as-blackgrand-04162340-raw-icr" or UUID
     parent_id: str | None = None                  # prior version in immutable chain
-    metadata: Mapping[str, Any] = field(
-        default_factory=lambda: MappingProxyType({})
-    )
+    # NB: plain dict (not MappingProxyType) so Bank pickles through the
+    # ProcessPool. Frozen dataclass still prevents replacing the attribute;
+    # by-convention callers treat the dict as read-only.
+    metadata: Mapping[str, Any] = field(default_factory=dict)
     notes: tuple[Note, ...] = ()
 
     # i2: anchors are now strongly typed. Still a tuple (immutable) for hashability.
@@ -218,7 +218,7 @@ class Bank:
         return cls(
             id=bank_id,
             parent_id=parent_id or data.get("parent_id"),
-            metadata=MappingProxyType(metadata),
+            metadata=metadata,
             notes=notes,
             anchors=anchors,
         )
