@@ -70,6 +70,49 @@ BridgeDep = Annotated[MidiBridge, Depends(get_bridge)]
 
 
 # ---------------------------------------------------------------------------
+# Push-bank progress state
+# ---------------------------------------------------------------------------
+# One-slot snapshot of the most recent (or in-flight) push-bank job. Only one
+# job runs at a time — a large bank is a few hundred frames and the bridge is
+# single-threaded anyway. Keeping it singleton avoids the complexity of a job
+# registry for a UX that's already trivially "click, wait, done".
+
+import threading as _threading
+import time as _time
+from dataclasses import dataclass, field as _field
+
+
+@dataclass
+class _PushBankJob:
+    active: bool = False
+    sent: int = 0
+    total: int = 0
+    bank_id: str | None = None
+    core: str | None = None
+    done: bool = False
+    error: str | None = None
+    started_at: float | None = None
+
+
+_push_job: _PushBankJob = _PushBankJob()
+_push_lock = _threading.Lock()
+
+
+def _push_job_snapshot() -> _PushBankJob:
+    with _push_lock:
+        return _PushBankJob(
+            active=_push_job.active,
+            sent=_push_job.sent,
+            total=_push_job.total,
+            bank_id=_push_job.bank_id,
+            core=_push_job.core,
+            done=_push_job.done,
+            error=_push_job.error,
+            started_at=_push_job.started_at,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Core-name → id mapping (API layer convenience)
 # ---------------------------------------------------------------------------
 
@@ -142,6 +185,22 @@ class PushBankResponse(BaseModel):
     core: str
     n_frames: int
     bytes_sent: int
+
+
+class PushBankProgressResponse(BaseModel):
+    """Snapshot of the most recent push-bank job.
+
+    The FE polls this while push-bank is in flight. `active` flips to False
+    when the job settles (success or error); `error` is non-null on failure.
+    """
+    active: bool
+    sent: int
+    total: int
+    bank_id: str | None
+    core: str | None
+    done: bool
+    error: str | None
+    started_at: float | None
 
 
 class PushPartialBody(BaseModel):
@@ -321,19 +380,72 @@ async def push_bank(
     bank_json = json.dumps(payload, ensure_ascii=False)
     core_id = _resolve_core(body.core)
 
+    # Initialise the progress snapshot so the FE's poll sees an active job
+    # immediately after it fires this POST.
+    with _push_lock:
+        _push_job.active = True
+        _push_job.sent = 0
+        _push_job.total = 0
+        _push_job.bank_id = body.bank_id
+        _push_job.core = body.core
+        _push_job.done = False
+        _push_job.error = None
+        _push_job.started_at = _time.time()
+
+    def _on_progress(sent: int, total: int) -> None:
+        # Runs on the worker thread; lock-protected because the GET poll
+        # reads this concurrently on the event loop.
+        with _push_lock:
+            _push_job.sent = sent
+            _push_job.total = total
+
     # Send chunks on a worker thread — each SysEx send is a blocking syscall.
-    # functools.partial wraps kwargs since run_in_executor doesn't accept them.
     import functools
     loop = asyncio.get_running_loop()
-    n_frames = await loop.run_in_executor(
-        None,
-        functools.partial(bridge.push_bank, core_id=core_id, bank_json=bank_json),
-    )
+    try:
+        n_frames = await loop.run_in_executor(
+            None,
+            functools.partial(
+                bridge.push_bank,
+                core_id=core_id,
+                bank_json=bank_json,
+                on_progress=_on_progress,
+            ),
+        )
+    except Exception as exc:
+        with _push_lock:
+            _push_job.active = False
+            _push_job.done = True
+            _push_job.error = str(exc)
+        logger.warning("midi.push_bank.failed", extra={"detail": str(exc)})
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            f"push-bank failed: {exc}") from exc
+
+    with _push_lock:
+        _push_job.active = False
+        _push_job.done = True
+
     return PushBankResponse(
         bank_id=body.bank_id,
         core=body.core,
         n_frames=n_frames,
         bytes_sent=len(bank_json.encode("utf-8")),
+    )
+
+
+@router.get("/push-bank/progress", response_model=PushBankProgressResponse)
+async def push_bank_progress() -> PushBankProgressResponse:
+    """Poll-friendly progress snapshot for the most recent push-bank job."""
+    j = _push_job_snapshot()
+    return PushBankProgressResponse(
+        active=j.active,
+        sent=j.sent,
+        total=j.total,
+        bank_id=j.bank_id,
+        core=j.core,
+        done=j.done,
+        error=j.error,
+        started_at=j.started_at,
     )
 
 

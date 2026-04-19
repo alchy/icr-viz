@@ -14,8 +14,8 @@
  */
 
 import {useEffect, useState} from 'react';
-import {useQuery} from '@tanstack/react-query';
-import {Piano} from 'lucide-react';
+import {useQuery, useQueryClient} from '@tanstack/react-query';
+import {Piano, RefreshCw} from 'lucide-react';
 
 import {AnchorEditorPopover} from '@/components/AnchorEditorPopover';
 import {AnchorInterpolatePanel} from '@/components/AnchorInterpolatePanel';
@@ -42,6 +42,7 @@ import type {MathParam} from '@/types';
 type TabId = 'bank' | 'midi' | 'run' | 'anchors' | 'analytics' | 'surface';
 
 export default function App() {
+  const qc = useQueryClient();
   const [tab, setTab] = useState<TabId>('bank');
   const [bankId, setBankId] = useState<string | null>(null);
   const [midi, setMidi] = useState<number | null>(null);
@@ -91,6 +92,16 @@ export default function App() {
   };
 
   const hasSelection = bankId && midi !== null && velocity !== null;
+
+  /**
+   * Invalidate the expensive cross-bank analytics caches so the next fetch
+   * recomputes from scratch. We keep them sticky by default so anchor edits
+   * on tabs 4 don't trigger the full re-run — the user opts back in here.
+   */
+  const recomputeAnalytics = () => {
+    qc.invalidateQueries({queryKey: ['math-analysis']});
+    qc.invalidateQueries({queryKey: ['deviation']});
+  };
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -185,6 +196,19 @@ export default function App() {
         <TabsContent value="analytics" className="pb-8">
           <main className="pt-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
             <aside className="lg:col-span-4 space-y-4">
+              <div className="flex items-center justify-between gap-2 bg-white border border-zinc-200 rounded px-2 py-1.5">
+                <span className="text-[10px] text-zinc-500">
+                  Analytics are cached per bank. Anchor edits don't recompute
+                  automatically — click to refresh.
+                </span>
+                <button
+                  type="button"
+                  onClick={recomputeAnalytics}
+                  className="h-7 px-2 text-[10px] rounded border bg-zinc-50 border-zinc-200 hover:bg-zinc-100 inline-flex items-center gap-1 shrink-0"
+                >
+                  <RefreshCw className="w-3 h-3" /> Recompute
+                </button>
+              </div>
               <NoteSelector
                 bankId={bankId}
                 selectedMidi={midi}
@@ -194,6 +218,7 @@ export default function App() {
               />
               <AnomalyList
                 bankId={bankId}
+                enabled={tab === 'analytics'}
                 onSelectAnomaly={(m, v) => {
                   setMidi(m);
                   setVelocity(v);
@@ -228,6 +253,7 @@ export default function App() {
               />
               <MathRelationshipsPanel
                 bankId={bankId}
+                enabled={tab === 'analytics'}
                 onSelectNote={(m, v) => {
                   setMidi(m);
                   setVelocity(v);

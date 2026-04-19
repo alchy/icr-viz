@@ -34,7 +34,7 @@ import struct
 import threading
 import time
 from dataclasses import dataclass
-from typing import Iterator
+from typing import Callable, Iterator
 
 
 logger = logging.getLogger(__name__)
@@ -384,17 +384,33 @@ class MidiBridge:
             return None
         return time.perf_counter() - t0
 
-    def push_bank(self, *, core_id: int, bank_json: str) -> int:
-        """Send a SET_BANK chunked payload. Returns the number of frames sent."""
-        count = 0
-        for frame in encode_set_bank_chunked(core_id=core_id, bank_json=bank_json):
+    def push_bank(
+        self,
+        *,
+        core_id: int,
+        bank_json: str,
+        on_progress: Callable[[int, int], None] | None = None,
+    ) -> int:
+        """Send a SET_BANK chunked payload. Returns the number of frames sent.
+
+        ``on_progress(sent, total)`` is invoked after each frame is written, so
+        callers can surface a live progress bar. Total is known up-front
+        because ``encode_set_bank_chunked`` is deterministic on the payload
+        size (no adaptive chunking).
+        """
+        frames = list(encode_set_bank_chunked(core_id=core_id, bank_json=bank_json))
+        total = len(frames)
+        if on_progress:
+            on_progress(0, total)
+        for idx, frame in enumerate(frames):
             self.send_sysex(frame)
-            count += 1
+            if on_progress:
+                on_progress(idx + 1, total)
         logger.info(
             "midi.push_bank",
-            extra={"core_id": core_id, "n_frames": count, "bytes": len(bank_json)},
+            extra={"core_id": core_id, "n_frames": total, "bytes": len(bank_json)},
         )
-        return count
+        return total
 
     def push_partial_param(
         self,

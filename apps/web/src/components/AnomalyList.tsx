@@ -10,6 +10,8 @@ import type {DeviationEntry} from '@/types';
 interface Props {
   bankId: string | null;
   onSelectAnomaly: (midi: number, velocity: number) => void;
+  /** Gates the heavy deviation-report fetch. False on tabs that don't need it. */
+  enabled?: boolean;
 }
 
 const ACTION_COLOR: Record<DeviationEntry['recommend_action'], string> = {
@@ -19,7 +21,7 @@ const ACTION_COLOR: Record<DeviationEntry['recommend_action'], string> = {
   fill: 'bg-indigo-100 text-indigo-700',
 };
 
-export function AnomalyList({bankId, onSelectAnomaly}: Props) {
+export function AnomalyList({bankId, onSelectAnomaly, enabled = true}: Props) {
   const {data: banks} = useBanks();
   const [minZ, setMinZ] = useState(2.0);
   const [selectedRefs, setSelectedRefs] = useState<Record<string, boolean>>({});
@@ -41,6 +43,7 @@ export function AnomalyList({bankId, onSelectAnomaly}: Props) {
   const {data: report, isLoading, error} = useDeviationReport(
     bankId,
     referenceIds.length > 0 ? {references: referenceIds, minZ} : null,
+    {enabled},
   );
 
   const toggleRef = (id: string) => {

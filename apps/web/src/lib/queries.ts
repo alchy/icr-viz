@@ -182,12 +182,22 @@ export function useDeviationReport(
     minZ?: number;
     parameters?: string[];
   } | null,
+  /**
+   * Extra gate the caller AND-s with the built-in bank/options check.
+   * Anchor-editing tabs pass `false` so the heavy recompute only fires
+   * when the user actually opens the Analytics tab.
+   */
+  {enabled = true}: {enabled?: boolean} = {},
 ) {
-  const enabled = !!bankId && !!options && options.references.length > 0;
+  const fullyEnabled = enabled
+    && !!bankId
+    && !!options
+    && options.references.length > 0;
   return useQuery({
     queryKey: ['deviation', bankId ?? '', options?.references.slice().sort().join(',') ?? '', options?.minZ ?? 2],
     queryFn: () => getDeviationReport(bankId!, options!),
-    enabled,
+    enabled: fullyEnabled,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -223,11 +233,14 @@ export function useSplineTransfer() {
 
 // ---- i4 math-analysis hooks --------------------------------------------
 
-export function useMathAnalysis(bankId: string | null) {
+export function useMathAnalysis(
+  bankId: string | null,
+  {enabled = true}: {enabled?: boolean} = {},
+) {
   return useQuery({
     queryKey: ['math-analysis', bankId ?? ''],
     queryFn: () => getMathAnalysis(bankId!),
-    enabled: !!bankId,
+    enabled: enabled && !!bankId,
     staleTime: 5 * 60 * 1000,
   });
 }

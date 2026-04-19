@@ -18,6 +18,7 @@ import {
   getIcrSettings,
   getIcrStatus,
   getMidiStatus,
+  getPushBankProgress,
   launchIcr,
   playNote,
   pushBank,
@@ -79,6 +80,15 @@ export function IcrRunnerPanel({bankId, midi, velocity}: Props) {
   });
   const pushBankMut = useMutation({mutationFn: pushBank});
   const playNoteMut = useMutation({mutationFn: playNote});
+
+  // Poll push-bank progress only while a job is in flight — saves the 200 ms
+  // timer when idle and stops immediately on done/error.
+  const pushProgressQ = useQuery({
+    queryKey: ['push-bank-progress'],
+    queryFn: getPushBankProgress,
+    refetchInterval: pushBankMut.isPending ? 200 : false,
+    enabled: pushBankMut.isPending || pushBankMut.isSuccess,
+  });
 
   const icrStatus = icrStatusQ.data;
   const midiStatus = midiStatusQ.data;
@@ -340,9 +350,38 @@ export function IcrRunnerPanel({bankId, midi, velocity}: Props) {
                 {(pushBankMut.error as Error).message}
               </div>
             )}
+            {(pushBankMut.isPending || pushProgressQ.data?.active) && (
+              <PushBankProgress
+                sent={pushProgressQ.data?.sent ?? 0}
+                total={pushProgressQ.data?.total ?? 0}
+              />
+            )}
+            {pushBankMut.isSuccess && pushProgressQ.data?.done && !pushProgressQ.data?.error && (
+              <div className="text-[10px] text-green-700">
+                Sent {pushProgressQ.data.sent} / {pushProgressQ.data.total} frames
+              </div>
+            )}
           </div>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function PushBankProgress({sent, total}: {sent: number; total: number}) {
+  const pct = total > 0 ? Math.min(100, Math.round((sent / total) * 100)) : 0;
+  return (
+    <div className="space-y-0.5">
+      <div className="flex justify-between text-[10px] text-zinc-500">
+        <span>Pushing bank…</span>
+        <span className="font-mono">{sent} / {total} ({pct}%)</span>
+      </div>
+      <div className="h-1.5 bg-zinc-200 rounded overflow-hidden">
+        <div
+          className="h-full bg-blue-600 transition-all"
+          style={{width: `${pct}%`}}
+        />
+      </div>
+    </div>
   );
 }

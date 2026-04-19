@@ -343,6 +343,21 @@ export function pushBank(body: {
   return sendJson('POST', '/api/midi/push-bank', body);
 }
 
+export interface PushBankProgress {
+  active: boolean;
+  sent: number;
+  total: number;
+  bank_id: string | null;
+  core: string | null;
+  done: boolean;
+  error: string | null;
+  started_at: number | null;
+}
+
+export function getPushBankProgress(): Promise<PushBankProgress> {
+  return getJson('/api/midi/push-bank/progress');
+}
+
 export function pushPartial(body: {
   midi: number;
   velocity: number;

@@ -10,10 +10,12 @@ import {cn} from '@/lib/utils';
 interface Props {
   bankId: string | null;
   onSelectNote: (midi: number, velocity: number) => void;
+  /** Gates the heavy math-analysis fetch. Set false on tabs that don't need it. */
+  enabled?: boolean;
 }
 
-export function MathRelationshipsPanel({bankId, onSelectNote}: Props) {
-  const {data, isLoading, error} = useMathAnalysis(bankId);
+export function MathRelationshipsPanel({bankId, onSelectNote, enabled = true}: Props) {
+  const {data, isLoading, error} = useMathAnalysis(bankId, {enabled});
 
   const B_series = useMemo(() => {
     if (!data) return [];
