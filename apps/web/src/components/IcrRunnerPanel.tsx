@@ -354,11 +354,15 @@ export function IcrRunnerPanel({bankId, midi, velocity}: Props) {
               <PushBankProgress
                 sent={pushProgressQ.data?.sent ?? 0}
                 total={pushProgressQ.data?.total ?? 0}
+                elapsedS={pushProgressQ.data?.elapsed_s ?? 0}
               />
             )}
             {pushBankMut.isSuccess && pushProgressQ.data?.done && !pushProgressQ.data?.error && (
               <div className="text-[10px] text-green-700">
                 Sent {pushProgressQ.data.sent} / {pushProgressQ.data.total} frames
+                {pushProgressQ.data.elapsed_s !== null && (
+                  <> in {pushProgressQ.data.elapsed_s.toFixed(1)} s</>
+                )}
               </div>
             )}
           </div>
@@ -368,17 +372,42 @@ export function IcrRunnerPanel({bankId, midi, velocity}: Props) {
   );
 }
 
-function PushBankProgress({sent, total}: {sent: number; total: number}) {
+function PushBankProgress({
+  sent, total, elapsedS,
+}: {
+  sent: number;
+  total: number;
+  elapsedS: number;
+}) {
   const pct = total > 0 ? Math.min(100, Math.round((sent / total) * 100)) : 0;
+  const rate = elapsedS > 0.1 ? sent / elapsedS : 0;
+  const etaS = rate > 0 && total > sent ? (total - sent) / rate : null;
+  // If we're past a couple of seconds and the send rate dropped below 5
+  // frames/s, the Windows MIDI driver is likely back-pressured. Warn the
+  // user so they know to check whether the engine is actually consuming.
+  const stalled = elapsedS > 3 && rate < 5 && sent < total;
   return (
     <div className="space-y-0.5">
       <div className="flex justify-between text-[10px] text-zinc-500">
-        <span>Pushing bank…</span>
-        <span className="font-mono">{sent} / {total} ({pct}%)</span>
+        <span>
+          Pushing bank…
+          {stalled && (
+            <span className="ml-2 text-amber-700">
+              stalled — is icrgui receiving on loopMIDI?
+            </span>
+          )}
+        </span>
+        <span className="font-mono">
+          {sent} / {total} ({pct}%) · {rate ? `${rate.toFixed(0)}/s` : '—'}
+          {etaS !== null && <> · ETA {etaS.toFixed(0)} s</>}
+        </span>
       </div>
       <div className="h-1.5 bg-zinc-200 rounded overflow-hidden">
         <div
-          className="h-full bg-blue-600 transition-all"
+          className={cn(
+            'h-full transition-all',
+            stalled ? 'bg-amber-500' : 'bg-blue-600',
+          )}
           style={{width: `${pct}%`}}
         />
       </div>

@@ -178,6 +178,10 @@ class PingResponse(BaseModel):
 class PushBankBody(BaseModel):
     bank_id: str
     core: Literal["active", "additive", "physical", "sampler", "sine", "iff"] = "active"
+    # ms between SysEx frames. Prevents the Windows MME / loopMIDI driver
+    # from saturating when the engine is slow to drain. 1 ms is safe for
+    # large banks; 0 is fine for small banks or non-Windows.
+    chunk_delay_ms: float = Field(1.0, ge=0.0, le=50.0)
 
 
 class PushBankResponse(BaseModel):
@@ -192,6 +196,7 @@ class PushBankProgressResponse(BaseModel):
 
     The FE polls this while push-bank is in flight. `active` flips to False
     when the job settles (success or error); `error` is non-null on failure.
+    `elapsed_s` lets the client distinguish slow-but-advancing from stalled.
     """
     active: bool
     sent: int
@@ -201,6 +206,7 @@ class PushBankProgressResponse(BaseModel):
     done: bool
     error: str | None
     started_at: float | None
+    elapsed_s: float | None
 
 
 class PushPartialBody(BaseModel):
@@ -410,6 +416,7 @@ async def push_bank(
                 core_id=core_id,
                 bank_json=bank_json,
                 on_progress=_on_progress,
+                chunk_delay_s=body.chunk_delay_ms / 1000.0,
             ),
         )
     except Exception as exc:
@@ -437,6 +444,7 @@ async def push_bank(
 async def push_bank_progress() -> PushBankProgressResponse:
     """Poll-friendly progress snapshot for the most recent push-bank job."""
     j = _push_job_snapshot()
+    elapsed = (_time.time() - j.started_at) if j.started_at else None
     return PushBankProgressResponse(
         active=j.active,
         sent=j.sent,
@@ -446,6 +454,7 @@ async def push_bank_progress() -> PushBankProgressResponse:
         done=j.done,
         error=j.error,
         started_at=j.started_at,
+        elapsed_s=elapsed,
     )
 
 

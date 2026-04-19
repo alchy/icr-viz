@@ -329,33 +329,46 @@ def main() -> int:
             if args.kill_existing:
                 pid = _find_listening_pid(args.port)
                 if pid is None:
-                    print(f"run-backend: ERROR: --kill-existing but no LISTENING pid on :{args.port}; {hint}",
+                    # Busy without a LISTENING pid → port is in TIME_WAIT from
+                    # a prior clean shutdown. Wait for it to drain instead of
+                    # bailing out — the common case here is "restart right
+                    # after Ctrl+C".
+                    print(f"run-backend: port :{args.port} busy but no LISTENING pid; waiting for TIME_WAIT to clear…",
                           file=sys.stderr)
-                    return 2
-                # Ask the old backend to stop its child ICR gracefully before we hard-kill uvicorn.
-                icr_status = _stop_icr_via_api(args.host, args.port)
-                if icr_status is not None:
-                    print(f"run-backend: --kill-existing: asked old backend to stop ICR → {icr_status}",
-                          file=sys.stderr)
-                print(f"run-backend: --kill-existing: killing PID {pid} on :{args.port}", file=sys.stderr)
-                if not _kill_pid(pid):
-                    print(f"run-backend: ERROR: failed to kill PID {pid}", file=sys.stderr)
-                    return 2
-                # Belt-and-braces: taskkill any lingering ICR binary by image name.
-                icr_path = _resolve_icr_path()
-                n = _kill_icr_by_name(icr_path)
-                if n:
-                    print(f"run-backend: --kill-existing: also killed lingering {Path(icr_path).name}",
-                          file=sys.stderr)
-                # Wait briefly for the socket to free, then recheck.
-                for _ in range(20):
-                    time.sleep(0.1)
-                    ok2, _ = _check_port_free(args.host, args.port)
-                    if ok2:
-                        break
+                    for _ in range(60):   # up to 12 s
+                        time.sleep(0.2)
+                        ok2, _ = _check_port_free(args.host, args.port)
+                        if ok2:
+                            break
+                    else:
+                        print(f"run-backend: ERROR: :{args.port} still busy after wait; {hint}",
+                              file=sys.stderr)
+                        return 2
                 else:
-                    print(f"run-backend: ERROR: port :{args.port} still busy after kill", file=sys.stderr)
-                    return 2
+                    # Ask the old backend to stop its child ICR gracefully before we hard-kill uvicorn.
+                    icr_status = _stop_icr_via_api(args.host, args.port)
+                    if icr_status is not None:
+                        print(f"run-backend: --kill-existing: asked old backend to stop ICR → {icr_status}",
+                              file=sys.stderr)
+                    print(f"run-backend: --kill-existing: killing PID {pid} on :{args.port}", file=sys.stderr)
+                    if not _kill_pid(pid):
+                        print(f"run-backend: ERROR: failed to kill PID {pid}", file=sys.stderr)
+                        return 2
+                    # Belt-and-braces: taskkill any lingering ICR binary by image name.
+                    icr_path = _resolve_icr_path()
+                    n = _kill_icr_by_name(icr_path)
+                    if n:
+                        print(f"run-backend: --kill-existing: also killed lingering {Path(icr_path).name}",
+                              file=sys.stderr)
+                    # Wait briefly for the socket to free, then recheck.
+                    for _ in range(20):
+                        time.sleep(0.1)
+                        ok2, _ = _check_port_free(args.host, args.port)
+                        if ok2:
+                            break
+                    else:
+                        print(f"run-backend: ERROR: port :{args.port} still busy after kill", file=sys.stderr)
+                        return 2
             else:
                 print(f"run-backend: ERROR: {hint}", file=sys.stderr)
                 return 2

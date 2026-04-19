@@ -390,6 +390,7 @@ class MidiBridge:
         core_id: int,
         bank_json: str,
         on_progress: Callable[[int, int], None] | None = None,
+        chunk_delay_s: float = 0.0,
     ) -> int:
         """Send a SET_BANK chunked payload. Returns the number of frames sent.
 
@@ -397,6 +398,12 @@ class MidiBridge:
         callers can surface a live progress bar. Total is known up-front
         because ``encode_set_bank_chunked`` is deterministic on the payload
         size (no adaptive chunking).
+
+        ``chunk_delay_s`` pauses between frames. Non-zero values throttle the
+        Windows MME output buffer so loopMIDI / the engine have time to
+        consume — without it, a 15 k-frame bank can saturate the driver and
+        make midiOutLongMsg block for tens of seconds at a time. 1 ms is a
+        good default for large banks; 0 is fine for small banks or Linux.
         """
         frames = list(encode_set_bank_chunked(core_id=core_id, bank_json=bank_json))
         total = len(frames)
@@ -406,9 +413,14 @@ class MidiBridge:
             self.send_sysex(frame)
             if on_progress:
                 on_progress(idx + 1, total)
+            if chunk_delay_s > 0.0:
+                time.sleep(chunk_delay_s)
         logger.info(
             "midi.push_bank",
-            extra={"core_id": core_id, "n_frames": total, "bytes": len(bank_json)},
+            extra={
+                "core_id": core_id, "n_frames": total, "bytes": len(bank_json),
+                "chunk_delay_ms": round(chunk_delay_s * 1000, 3),
+            },
         )
         return total
 

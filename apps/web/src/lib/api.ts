@@ -352,6 +352,7 @@ export interface PushBankProgress {
   done: boolean;
   error: string | null;
   started_at: number | null;
+  elapsed_s: number | null;
 }
 
 export function getPushBankProgress(): Promise<PushBankProgress> {
