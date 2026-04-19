@@ -92,16 +92,25 @@ export function IcrRunnerPanel({bankId, midi, velocity}: Props) {
   const canLaunch = missingReqs.length === 0 && !running && !launchMut.isPending;
 
   // Preview the command exactly as the backend will invoke it. The actual
-  // --params file path is resolved at launch time from the OS temp dir, so
-  // we show the expected pattern. Windows paths get quoted when they have
-  // spaces to match what subprocess will actually do under the hood.
+  // --soundbank-file path is resolved at launch time from the OS temp dir,
+  // so we show the expected pattern. Windows paths get quoted when they
+  // have spaces to match subprocess's own behaviour.
+  const appSettingsQ = useQuery({
+    queryKey: ['app-settings'],
+    queryFn: async () => (await fetch('/api/settings')).json() as Promise<Record<string, unknown>>,
+  });
   const quote = (s: string) => (s.includes(' ') ? `"${s}"` : s);
   const commandPreview = (() => {
     if (!icrPath) return null;
     const parts: string[] = [quote(icrPath), '--core', engineCore];
     if (bankId) {
-      parts.push('--params');
-      parts.push(`<temp>/icr-viz-launch/${bankId}.icr.json`);
+      parts.push('--soundbank-file');
+      parts.push(quote(`<temp>/icr-viz-launch/${bankId}.icr.json`));
+    }
+    const dirs = (appSettingsQ.data?.bank_dirs as string[] | undefined) ?? [];
+    if (dirs.length > 0 && dirs[0]) {
+      parts.push('--soundbank-dir');
+      parts.push(quote(dirs[0]));
     }
     return parts.join(' ');
   })();

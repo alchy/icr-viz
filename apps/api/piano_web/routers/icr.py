@@ -158,11 +158,19 @@ async def launch(
             "no icr_path — POST /api/icr/settings with {icr_path: <path>} first, or include path in body",
         )
 
-    # Compose CLI args: --core <Name> [--params <tempfile>] plus any caller extras.
+# Compose CLI args: --core <Name> [--soundbank-file <tempfile>]
+    # [--soundbank-dir <first bank_dirs entry>] plus any caller extras.
     args: list[str] = ["--core", body.core]
     if body.bank_id:
         bank_file = await _export_bank_for_launch(bank_repo, body.bank_id)
-        args += ["--params", str(bank_file)]
+        args += ["--soundbank-file", str(bank_file)]
+    # Let the engine's bank dropdown work when launched from a different cwd:
+    # use the first configured bank_dirs entry as --soundbank-dir.
+    bank_dirs = settings.get("bank_dirs") or []
+    if isinstance(bank_dirs, list) and bank_dirs:
+        first = str(bank_dirs[0]) if bank_dirs[0] else ""
+        if first:
+            args += ["--soundbank-dir", first]
     args += list(body.extra_args)
 
     try:
