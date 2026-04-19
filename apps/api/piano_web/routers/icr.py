@@ -158,19 +158,40 @@ async def launch(
             "no icr_path — POST /api/icr/settings with {icr_path: <path>} first, or include path in body",
         )
 
-# Compose CLI args: --core <Name> [--soundbank-file <tempfile>]
-    # [--soundbank-dir <first bank_dirs entry>] plus any caller extras.
+# Compose CLI args. Each --foo flag is skipped when its settings key is
+    # None, so users only opt in to what they need. Schema mirrors icrgui 1:1.
     args: list[str] = ["--core", body.core]
     if body.bank_id:
         bank_file = await _export_bank_for_launch(bank_repo, body.bank_id)
         args += ["--soundbank-file", str(bank_file)]
-    # Let the engine's bank dropdown work when launched from a different cwd:
-    # use the first configured bank_dirs entry as --soundbank-dir.
-    bank_dirs = settings.get("bank_dirs") or []
-    if isinstance(bank_dirs, list) and bank_dirs:
-        first = str(bank_dirs[0]) if bank_dirs[0] else ""
-        if first:
-            args += ["--soundbank-dir", first]
+
+    def _str_or_none(v: object) -> str | None:
+        return str(v) if v else None
+
+    # --soundbank-dir: prefer explicit settings.soundbank_dir, else
+    # fall back to the first legacy bank_dirs entry.
+    sb_dir = _str_or_none(settings.get("soundbank_dir"))
+    if sb_dir is None:
+        bank_dirs = settings.get("bank_dirs") or []
+        if isinstance(bank_dirs, list) and bank_dirs:
+            sb_dir = _str_or_none(bank_dirs[0])
+    if sb_dir:
+        args += ["--soundbank-dir", sb_dir]
+
+    ir_file = _str_or_none(settings.get("ir_file"))
+    if ir_file:
+        args += ["--ir-file", ir_file]
+    ir_dir = _str_or_none(settings.get("ir_dir"))
+    if ir_dir:
+        args += ["--ir-dir", ir_dir]
+
+    ec_file = _str_or_none(settings.get("engine_config_file"))
+    if ec_file:
+        args += ["--engine-config-file", ec_file]
+    ec_dir = _str_or_none(settings.get("engine_config_dir"))
+    if ec_dir:
+        args += ["--engine-config-dir", ec_dir]
+
     args += list(body.extra_args)
 
     try:

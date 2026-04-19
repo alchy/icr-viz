@@ -7,8 +7,17 @@ runs); JSON is accepted as a fallback for older installations that shipped
 
 Schema — all keys optional; unknown keys preserved on round-trip:
 
-    icr_path:         str        # path to icr.exe / icr binary
-    bank_dirs:        list[str]  # directories scanned by the ingest script
+    icr_path:              str        # path to icr.exe / icr binary
+    bank_dirs:             list[str]  # directories scanned by the ingest script
+
+    # Overrides forwarded to icrgui on launch. Each maps 1:1 onto an engine
+    # CLI flag so what the user sets here is exactly what icrgui receives.
+    soundbank_dir:         str | null # --soundbank-dir  (GUI bank dropdown root)
+    ir_file:               str | null # --ir-file        (soundboard IR WAV)
+    ir_dir:                str | null # --ir-dir         (GUI IR dropdown root)
+    engine_config_file:    str | null # --engine-config-file (icr-config.json)
+    engine_config_dir:     str | null # --engine-config-dir
+
     midi:
       default_input:  str | null # preferred input port *name*
       default_output: str | null # preferred output port *name*
@@ -59,6 +68,12 @@ def _legacy_json_path() -> Path:
 DEFAULT_SETTINGS: dict[str, Any] = {
     "icr_path": None,
     "bank_dirs": [],
+    # Engine launch overrides — sent verbatim to icrgui's CLI. None ⇒ skipped.
+    "soundbank_dir": None,
+    "ir_file": None,
+    "ir_dir": None,
+    "engine_config_file": None,
+    "engine_config_dir": None,
     "midi": {
         "default_input": None,
         "default_output": None,

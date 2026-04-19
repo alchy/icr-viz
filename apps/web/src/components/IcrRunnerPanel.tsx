@@ -102,16 +102,26 @@ export function IcrRunnerPanel({bankId, midi, velocity}: Props) {
   const quote = (s: string) => (s.includes(' ') ? `"${s}"` : s);
   const commandPreview = (() => {
     if (!icrPath) return null;
+    const s = appSettingsQ.data ?? {};
     const parts: string[] = [quote(icrPath), '--core', engineCore];
     if (bankId) {
       parts.push('--soundbank-file');
       parts.push(quote(`<temp>/icr-viz-launch/${bankId}.icr.json`));
     }
-    const dirs = (appSettingsQ.data?.bank_dirs as string[] | undefined) ?? [];
-    if (dirs.length > 0 && dirs[0]) {
-      parts.push('--soundbank-dir');
-      parts.push(quote(dirs[0]));
-    }
+    const sbDir = (s.soundbank_dir as string | null | undefined)
+      ?? ((s.bank_dirs as string[] | undefined) ?? [])[0];
+    if (sbDir) parts.push('--soundbank-dir', quote(sbDir));
+
+    const irFile = s.ir_file as string | null | undefined;
+    if (irFile) parts.push('--ir-file', quote(irFile));
+    const irDir = s.ir_dir as string | null | undefined;
+    if (irDir) parts.push('--ir-dir', quote(irDir));
+
+    const ecFile = s.engine_config_file as string | null | undefined;
+    if (ecFile) parts.push('--engine-config-file', quote(ecFile));
+    const ecDir = s.engine_config_dir as string | null | undefined;
+    if (ecDir) parts.push('--engine-config-dir', quote(ecDir));
+
     return parts.join(' ');
   })();
 
