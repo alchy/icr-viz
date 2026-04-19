@@ -104,6 +104,10 @@ class PortsResponse(BaseModel):
 
 
 class ConnectBody(BaseModel):
+    # Names preferred (stable across enumeration order). Indices kept for
+    # back-compat — if both are given the name wins.
+    input_port_name: str | None = None
+    output_port_name: str | None = None
     input_port_index: int | None = None
     output_port_index: int | None = None
 
@@ -197,20 +201,49 @@ async def get_status(bridge: BridgeDep) -> StatusResponse:
 
 @router.post("/connect", response_model=StatusResponse)
 async def connect(body: ConnectBody, bridge: BridgeDep) -> StatusResponse:
-    if body.input_port_index is None and body.output_port_index is None:
+    # Resolve names → indices (name wins when both are given).
+    in_idx = body.input_port_index
+    out_idx = body.output_port_index
+    if body.input_port_name is not None:
+        names = bridge.list_input_ports()
+        try:
+            in_idx = names.index(body.input_port_name)
+        except ValueError:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"input port {body.input_port_name!r} not present; got {names}",
+            )
+    if body.output_port_name is not None:
+        names = bridge.list_output_ports()
+        try:
+            out_idx = names.index(body.output_port_name)
+        except ValueError:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"output port {body.output_port_name!r} not present; got {names}",
+            )
+    if in_idx is None and out_idx is None:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            "at least one of input_port_index or output_port_index must be given",
+            "at least one of input_port_(name|index) or output_port_(name|index) must be given",
         )
     try:
-        bridge.open(
-            input_port_index=body.input_port_index,
-            output_port_index=body.output_port_index,
-        )
+        bridge.open(input_port_index=in_idx, output_port_index=out_idx)
     except Exception as exc:
         logger.warning("midi.connect.failed", extra={"detail": str(exc)})
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"failed to open ports: {exc}") from exc
     s = bridge.status()
+
+    # Persist the resolved names so the next backend run auto-connects.
+    try:
+        from piano_web import settings as _settings
+        _settings.save({"midi": {
+            "default_input": s.input_port_name,
+            "default_output": s.output_port_name,
+        }})
+    except Exception as exc:
+        logger.warning("midi.connect.settings_save_failed", extra={"detail": str(exc)})
+
     return StatusResponse(
         input_open=s.input_open,
         output_open=s.output_open,

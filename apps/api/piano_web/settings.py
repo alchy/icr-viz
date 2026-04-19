@@ -10,8 +10,8 @@ Schema — all keys optional; unknown keys preserved on round-trip:
     icr_path:         str        # path to icr.exe / icr binary
     bank_dirs:        list[str]  # directories scanned by the ingest script
     midi:
-      default_input:  int | null # preferred input port index
-      default_output: int | null # preferred output port index
+      default_input:  str | null # preferred input port *name*
+      default_output: str | null # preferred output port *name*
       default_core:   str        # 'active' | 'additive' | ...
     log_level:        str        # DEBUG / INFO / WARNING
 

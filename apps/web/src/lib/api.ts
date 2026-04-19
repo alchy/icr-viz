@@ -311,8 +311,10 @@ export function getMidiStatus(): Promise<import('@/types').MidiStatus> {
 }
 
 export function connectMidi(body: {
-  input_port_index: number | null;
-  output_port_index: number | null;
+  input_port_name?: string | null;
+  output_port_name?: string | null;
+  input_port_index?: number | null;
+  output_port_index?: number | null;
 }): Promise<import('@/types').MidiStatus> {
   return sendJson('POST', '/api/midi/connect', body);
 }

@@ -42,6 +42,29 @@ async def lifespan(app: FastAPI):
     configure_logging()
     logger = logging.getLogger(__name__)
     await init_schema()
+
+    # Best-effort auto-connect of the MIDI bridge using persisted port names.
+    # Skipped silently on any error — the user can still connect from the UI.
+    try:
+        from . import settings as _settings
+        from .routers.midi import get_bridge
+        cfg = _settings.load().get("midi") or {}
+        in_name = cfg.get("default_input")
+        out_name = cfg.get("default_output")
+        if in_name or out_name:
+            bridge = get_bridge()
+            ins = bridge.list_input_ports()
+            outs = bridge.list_output_ports()
+            in_idx = ins.index(in_name) if in_name in ins else None
+            out_idx = outs.index(out_name) if out_name in outs else None
+            if in_idx is not None or out_idx is not None:
+                bridge.open(input_port_index=in_idx, output_port_index=out_idx)
+                logger.info("app.startup.midi_autoconnect",
+                            extra={"input": in_name, "output": out_name})
+    except Exception as exc:
+        logger.warning("app.startup.midi_autoconnect_failed",
+                       extra={"detail": str(exc)})
+
     logger.info("app.startup")
     yield
     # Stop child ICR engine on shutdown so the wrapper's Ctrl+C doesn't
