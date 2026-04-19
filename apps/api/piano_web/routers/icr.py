@@ -158,6 +158,19 @@ async def launch(
             "no icr_path — POST /api/icr/settings with {icr_path: <path>} first, or include path in body",
         )
 
+    # Probe the current rtmidi enumeration so we can validate the names we're
+    # about to hand to icrgui. Windows MME + loopMIDI can enumerate a virtual
+    # port in only one direction; passing an unresolvable name would make
+    # icrgui's resolveMidiPort fall back to index 0 and pick something wild
+    # (e.g. Microsoft GS Wavetable Synth). Better to skip the flag.
+    from piano_web.midi_bridge import MidiBridge as _MidiBridge
+    try:
+        _sys_in = _MidiBridge.list_input_ports()
+        _sys_out = _MidiBridge.list_output_ports()
+    except Exception:
+        _sys_in = []
+        _sys_out = []
+
 # Compose CLI args. Each --foo flag is skipped when its settings key is
     # None, so users only opt in to what they need. Schema mirrors icrgui 1:1.
     args: list[str] = ["--core", body.core]
@@ -165,13 +178,19 @@ async def launch(
     def _str_or_none(v: object) -> str | None:
         return str(v) if v else None
 
+    bank_file: Path | None = None
     if body.bank_id:
         bank_file = await _export_bank_for_launch(bank_repo, body.bank_id)
         args += ["--soundbank-file", str(bank_file)]
 
     # Soundbank directory — single source of truth. Also used by the ingest
     # script, so keeping it at the top level avoids two places to configure.
+    # Fall back to the temp export dir when the user hasn't configured one,
+    # so icrgui's bank dropdown always has *something* to show (our exported
+    # bank) instead of rendering empty.
     bank_dir = _str_or_none(settings.get("bank_dir"))
+    if not bank_dir and bank_file is not None:
+        bank_dir = str(bank_file.parent)
     if bank_dir:
         args += ["--soundbank-dir", bank_dir]
 
@@ -192,16 +211,32 @@ async def launch(
 
     # MIDI: push the editor-side port pair into icrgui with SWAPPED direction.
     # Editor's OUTPUT (where we send SysEx) is engine's INPUT; editor's INPUT
-    # (where we listen for PONG) is engine's OUTPUT. Without this, the user
-    # has to re-pick ports inside icrgui every launch.
+    # (where we listen for PONG) is engine's OUTPUT.
+    #
+    # Guard: on Windows MME + loopMIDI a virtual port often enumerates in
+    # only one direction. If we hand icrgui a name that isn't in the matching
+    # enum, its resolveMidiPort falls back to index 0 and picks something
+    # wildly wrong (e.g. Microsoft GS Wavetable Synth). Skip the flag when
+    # the name can't be resolved in the opposite direction — the user can
+    # pick manually in icrgui without being misled.
     midi_cfg = settings.get("midi") or {}
     if isinstance(midi_cfg, dict):
         editor_out = _str_or_none(midi_cfg.get("output"))
         editor_in = _str_or_none(midi_cfg.get("input"))
-        if editor_out:
+        if editor_out and editor_out in _sys_in:
             args += ["--midi-in", editor_out]
-        if editor_in:
+        elif editor_out:
+            logger.warning(
+                "api.icr.launch.midi_in_unresolvable",
+                extra={"editor_output": editor_out, "engine_inputs": _sys_in},
+            )
+        if editor_in and editor_in in _sys_out:
             args += ["--midi-out", editor_in]
+        elif editor_in:
+            logger.warning(
+                "api.icr.launch.midi_out_unresolvable",
+                extra={"editor_input": editor_in, "engine_outputs": _sys_out},
+            )
 
     args += list(body.extra_args)
 
