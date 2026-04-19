@@ -358,6 +358,16 @@ export function getIcrSettings(): Promise<import('@/types').IcrSettings> {
   return getJson('/api/icr/settings');
 }
 
+export function getAppSettings(): Promise<Record<string, unknown>> {
+  return getJson('/api/settings');
+}
+
+export function saveAppSettings(
+  partial: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  return sendJson('POST', '/api/settings', partial);
+}
+
 export function saveIcrSettings(body: {icr_path: string}): Promise<import('@/types').IcrSettings> {
   return sendJson('POST', '/api/icr/settings', body);
 }

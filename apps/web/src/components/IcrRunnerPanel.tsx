@@ -91,6 +91,21 @@ export function IcrRunnerPanel({bankId, midi, velocity}: Props) {
   if (!icrPath) missingReqs.push('icr path');
   const canLaunch = missingReqs.length === 0 && !running && !launchMut.isPending;
 
+  // Preview the command exactly as the backend will invoke it. The actual
+  // --params file path is resolved at launch time from the OS temp dir, so
+  // we show the expected pattern. Windows paths get quoted when they have
+  // spaces to match what subprocess will actually do under the hood.
+  const quote = (s: string) => (s.includes(' ') ? `"${s}"` : s);
+  const commandPreview = (() => {
+    if (!icrPath) return null;
+    const parts: string[] = [quote(icrPath), '--core', engineCore];
+    if (bankId) {
+      parts.push('--params');
+      parts.push(`<temp>/icr-viz-launch/${bankId}.icr.json`);
+    }
+    return parts.join(' ');
+  })();
+
   return (
     <Card className="bg-white border-zinc-200 shadow-sm">
       <CardHeader className="pb-2 border-b border-zinc-50">
@@ -159,6 +174,41 @@ export function IcrRunnerPanel({bankId, midi, velocity}: Props) {
           <div className="text-[10px] text-zinc-500 font-mono">
             bank: {bankId ?? <span className="text-red-600">none</span>}
           </div>
+
+          {/* MIDI config (read-only, set on tab 2) */}
+          <div className="text-[10px] text-zinc-500 space-y-0.5">
+            <div>
+              MIDI in:{' '}
+              <span className={cn(
+                'font-mono',
+                midiStatus?.input_port_name ? 'text-zinc-700' : 'text-red-600',
+              )}>
+                {midiStatus?.input_port_name ?? 'not set — configure on tab 2'}
+              </span>
+            </div>
+            <div>
+              MIDI out:{' '}
+              <span className={cn(
+                'font-mono',
+                midiStatus?.output_port_name ? 'text-zinc-700' : 'text-red-600',
+              )}>
+                {midiStatus?.output_port_name ?? 'not set — configure on tab 2'}
+              </span>
+            </div>
+          </div>
+
+          {/* Command preview — exactly what the backend will spawn */}
+          {commandPreview && (
+            <div className="space-y-0.5">
+              <div className="text-[10px] uppercase tracking-wide text-zinc-500">
+                Command
+              </div>
+              <pre className="bg-zinc-900 text-zinc-100 rounded px-2 py-1.5 text-[10px] font-mono whitespace-pre-wrap break-all">
+                {commandPreview}
+              </pre>
+            </div>
+          )}
+
           <div className="flex gap-2">
             <button
               type="button"

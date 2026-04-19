@@ -1,31 +1,32 @@
 /**
  * MIDI bridge panel — "MIDI" tab.
  *
- * Design decisions:
+ * This tab is a preference editor, not a live connector:
+ *   - ICR is not running yet (that's tab 3), so Connect/Disconnect here
+ *     can't actually be tested against the other end.
+ *   - Instead we "Save config" to YAML; the backend auto-opens these ports
+ *     on startup (see app lifespan) so the pair is ready by tab 3.
+ *
+ * UI:
  *   - Port list is the UNION of backend input_ports ∪ output_ports. Windows
- *     MME sometimes lists each loopMIDI port in only one direction, but a
- *     virtual port is bidirectional in principle, so we let the user try
- *     either assignment. The backend surfaces a clear error if the chosen
- *     name isn't actually available in the requested direction.
- *   - Selection is via two checkbox columns (input, output) with mutex —
- *     picking port X as input disables it in the output column and vice
- *     versa. This prevents routing the editor's own output back into its
- *     own input, which would create a feedback loop.
- *   - Bridge status is polled globally (3 s) so other tabs react without
- *     the user revisiting this tab.
+ *     MME sometimes lists each loopMIDI port in only one direction, but the
+ *     port is bidirectional in principle, so we surface every name and let
+ *     the open attempt decide.
+ *   - Two checkbox columns (input, output) with mutex — picking port X for
+ *     input disables it in output to prevent a self-loop.
+ *   - Bridge status displayed read-only so the user sees whether the
+ *     backend-auto-connect picked up the saved pair on this run.
  */
 
 import {useEffect, useState} from 'react';
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
-import {Plug} from 'lucide-react';
+import {Plug, RefreshCw, Save} from 'lucide-react';
 
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {
-  connectMidi,
-  disconnectMidi,
   getMidiStatus,
   listMidiPorts,
-  midiPing,
+  saveAppSettings,
 } from '@/lib/api';
 import {cn} from '@/lib/utils';
 
@@ -37,7 +38,7 @@ export function MidiBridgePanel({requiresBank}: Props) {
   const qc = useQueryClient();
   const [inputName, setInputName] = useState<string | null>(null);
   const [outputName, setOutputName] = useState<string | null>(null);
-  const [pingRtt, setPingRtt] = useState<number | null>(null);
+  const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
   const portsQ = useQuery({queryKey: ['midi-ports'], queryFn: listMidiPorts});
   const midiStatusQ = useQuery({
@@ -46,8 +47,8 @@ export function MidiBridgePanel({requiresBank}: Props) {
     refetchInterval: 3000,
   });
 
-  // Hydrate from server state on first mount so a browser reload shows the
-  // current pair without requiring the user to re-pick.
+  // Hydrate from currently-open bridge (after backend auto-connect) so the
+  // user doesn't have to re-tick on every page load.
   useEffect(() => {
     const s = midiStatusQ.data;
     if (!s) return;
@@ -55,24 +56,19 @@ export function MidiBridgePanel({requiresBank}: Props) {
     if (outputName === null && s.output_port_name) setOutputName(s.output_port_name);
   }, [midiStatusQ.data]);
 
-  const connectMut = useMutation({
-    mutationFn: connectMidi,
-    onSuccess: () => qc.invalidateQueries({queryKey: ['midi-status']}),
-  });
-  const disconnectMut = useMutation({
-    mutationFn: disconnectMidi,
-    onSuccess: () => qc.invalidateQueries({queryKey: ['midi-status']}),
-  });
-  const pingMut = useMutation({
-    mutationFn: midiPing,
-    onSuccess: (res) => setPingRtt(res.ok ? res.rtt_ms : null),
+  const saveMut = useMutation({
+    mutationFn: saveAppSettings,
+    onSuccess: () => {
+      setSavedMsg('Saved — takes effect on next backend start.');
+      qc.invalidateQueries({queryKey: ['midi-status']});
+      setTimeout(() => setSavedMsg(null), 4000);
+    },
   });
 
   const ports = portsQ.data;
   const midiStatus = midiStatusQ.data;
   const connected = !!midiStatus?.output_open;
 
-  // Union of all port names (dedup, stable order: inputs first, then output-only).
   const allNames: string[] = (() => {
     if (!ports) return [];
     const seen = new Set<string>();
@@ -86,14 +82,14 @@ export function MidiBridgePanel({requiresBank}: Props) {
     return out;
   })();
 
-  const connectable = inputName !== null || outputName !== null;
+  const canSave = inputName !== null || outputName !== null;
 
   return (
     <Card className="bg-white border-zinc-200 shadow-sm">
       <CardHeader className="pb-2 border-b border-zinc-50">
         <CardTitle className="text-sm font-bold text-zinc-800 flex items-center gap-2">
           <Plug className="w-4 h-4 text-blue-600" />
-          MIDI bridge
+          MIDI bridge preferences
           <span
             className={cn(
               'ml-2 w-2 h-2 rounded-full',
@@ -101,17 +97,19 @@ export function MidiBridgePanel({requiresBank}: Props) {
             )}
           />
           <span className="text-[10px] font-normal text-zinc-500">
-            {connected ? midiStatus?.output_port_name ?? 'connected' : 'disconnected'}
+            {connected
+              ? `live: ${midiStatus?.output_port_name ?? 'connected'}`
+              : 'bridge closed (auto-opens on backend start)'}
           </span>
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-3 space-y-3">
-        {requiresBank && (
-          <p className="text-[10px] text-zinc-500">
-            MIDI bridge is independent of bank selection; downstream actions
-            (Run ICR, Push bank, Audition) need both.
-          </p>
-        )}
+        <p className="text-[10px] text-zinc-500 leading-snug">
+          {requiresBank && <>Bridge is independent of bank selection. </>}
+          ICR isn't running yet (tab 3), so we can't round-trip a PONG from
+          here. Save your preferred pair; the backend auto-opens them on the
+          next start so tab 3 finds them ready.
+        </p>
 
         {allNames.length === 0 ? (
           <p className="text-[11px] text-zinc-500">
@@ -139,69 +137,41 @@ export function MidiBridgePanel({requiresBank}: Props) {
           </div>
         )}
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <button
             type="button"
-            onClick={() => connectMut.mutate({
-              input_port_name: inputName,
-              output_port_name: outputName,
+            onClick={() => portsQ.refetch()}
+            className="h-7 px-3 text-[11px] rounded border bg-zinc-50 border-zinc-200 hover:bg-zinc-100 inline-flex items-center gap-1"
+          >
+            <RefreshCw className="w-3 h-3" /> Refresh
+          </button>
+          <button
+            type="button"
+            onClick={() => saveMut.mutate({
+              midi: {
+                default_input: inputName,
+                default_output: outputName,
+              },
             })}
-            disabled={!connectable || connectMut.isPending}
+            disabled={!canSave || saveMut.isPending}
             className={cn(
-              'h-7 px-3 text-[11px] rounded border',
-              !connectable
+              'h-7 px-3 text-[11px] rounded border inline-flex items-center gap-1',
+              !canSave
                 ? 'bg-zinc-200 border-zinc-200 text-zinc-400 cursor-not-allowed'
                 : 'bg-blue-600 border-blue-600 text-white hover:bg-blue-700',
             )}
           >
-            Connect
+            <Save className="w-3 h-3" /> Save config
           </button>
-          <button
-            type="button"
-            onClick={() => disconnectMut.mutate()}
-            disabled={!connected}
-            className={cn(
-              'h-7 px-3 text-[11px] rounded border',
-              !connected
-                ? 'bg-zinc-200 border-zinc-200 text-zinc-400 cursor-not-allowed'
-                : 'bg-zinc-50 border-zinc-200 hover:bg-zinc-100',
-            )}
-          >
-            Disconnect
-          </button>
-          <button
-            type="button"
-            onClick={() => portsQ.refetch()}
-            className="h-7 px-2 text-[10px] rounded border bg-zinc-50 border-zinc-200 hover:bg-zinc-100"
-          >
-            Refresh
-          </button>
-          <button
-            type="button"
-            onClick={() => pingMut.mutate()}
-            disabled={!connected || pingMut.isPending}
-            className={cn(
-              'h-7 px-2 text-[11px] rounded border ml-auto',
-              !connected
-                ? 'bg-zinc-200 border-zinc-200 text-zinc-400'
-                : 'bg-zinc-50 border-zinc-200 hover:bg-zinc-100',
-            )}
-          >
-            Ping
-            {pingRtt !== null && pingRtt !== undefined && (
-              <span className="ml-1 text-green-700 font-mono">{pingRtt.toFixed(1)}ms</span>
-            )}
-            {pingMut.data && !pingMut.data.ok && (
-              <span className="ml-1 text-red-600">timeout</span>
-            )}
-          </button>
+          {savedMsg && (
+            <span className="text-[10px] text-green-700 ml-2">{savedMsg}</span>
+          )}
+          {saveMut.isError && (
+            <span className="text-[10px] text-red-600 ml-2">
+              {(saveMut.error as Error).message}
+            </span>
+          )}
         </div>
-
-        {connectMut.isError && (
-          <div className="text-[10px] text-red-600">
-            {(connectMut.error as Error).message}
-          </div>
-        )}
       </CardContent>
     </Card>
   );
@@ -210,11 +180,8 @@ export function MidiBridgePanel({requiresBank}: Props) {
 interface ColumnProps {
   title: string;
   allNames: string[];
-  /** Names that rtmidi confirmed are available in this direction — used to
-   *  render a subtle hint when the user picks one that may not work. */
   availability: string[];
   selected: string | null;
-  /** Name that's already chosen in the opposite column; disabled here. */
   disabledName: string | null;
   onPick: (name: string | null) => void;
 }
