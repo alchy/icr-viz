@@ -192,6 +192,24 @@ async def launch(
     if ec_dir:
         args += ["--engine-config-dir", ec_dir]
 
+    # Per-core SynthConfig overlay — passthrough of settings.core_config_file.
+    cc_file = _str_or_none(settings.get("core_config_file"))
+    if cc_file:
+        args += ["--core-config-file", cc_file]
+
+    # MIDI: push the editor-side port pair into icrgui with SWAPPED direction.
+    # Editor's OUTPUT (where we send SysEx) is engine's INPUT; editor's INPUT
+    # (where we listen for PONG) is engine's OUTPUT. Without this, the user
+    # has to manually pick ports inside icrgui every launch.
+    midi_cfg = settings.get("midi") or {}
+    if isinstance(midi_cfg, dict):
+        editor_out = _str_or_none(midi_cfg.get("default_output"))
+        editor_in = _str_or_none(midi_cfg.get("default_input"))
+        if editor_out:
+            args += ["--midi-in", editor_out]
+        if editor_in:
+            args += ["--midi-out", editor_in]
+
     args += list(body.extra_args)
 
     try:

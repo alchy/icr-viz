@@ -131,6 +131,13 @@ export function IcrRunnerPanel({bankId, midi, velocity}: Props) {
     if (ecFile) parts.push('--engine-config-file', quote(ecFile));
     const ecDir = s.engine_config_dir as string | null | undefined;
     if (ecDir) parts.push('--engine-config-dir', quote(ecDir));
+    const ccFile = s.core_config_file as string | null | undefined;
+    if (ccFile) parts.push('--core-config-file', quote(ccFile));
+
+    // MIDI: engine uses the OPPOSITE end of each port vs. the editor.
+    const midi = (s.midi as {default_input?: string | null; default_output?: string | null} | undefined) ?? {};
+    if (midi.default_output) parts.push('--midi-in', quote(midi.default_output));
+    if (midi.default_input) parts.push('--midi-out', quote(midi.default_input));
 
     return parts.join(' ');
   })();

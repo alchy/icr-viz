@@ -17,6 +17,11 @@ Schema — all keys optional; unknown keys preserved on round-trip:
     ir_dir:                str | null # --ir-dir         (GUI IR dropdown root)
     engine_config_file:    str | null # --engine-config-file (icr-config.json)
     engine_config_dir:     str | null # --engine-config-dir
+    core_config_file:      str | null # --core-config-file    (SynthConfig overlay)
+
+    # Engine MIDI pair — derived from midi.default_input/output at launch time
+    # (swapped, because editor and engine use opposite ends of the pair).
+    # Not stored separately; see routers/icr.py launch.
 
     midi:
       default_input:  str | null # preferred input port *name*
@@ -74,6 +79,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "ir_dir": None,
     "engine_config_file": None,
     "engine_config_dir": None,
+    "core_config_file": None,
     "midi": {
         "default_input": None,
         "default_output": None,
