@@ -49,8 +49,8 @@ async def lifespan(app: FastAPI):
         from . import settings as _settings
         from .routers.midi import get_bridge
         cfg = _settings.load().get("midi") or {}
-        in_name = cfg.get("default_input")
-        out_name = cfg.get("default_output")
+        in_name = cfg.get("input")
+        out_name = cfg.get("output")
         if in_name or out_name:
             bridge = get_bridge()
             ins = bridge.list_input_ports()

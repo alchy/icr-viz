@@ -161,50 +161,43 @@ async def launch(
 # Compose CLI args. Each --foo flag is skipped when its settings key is
     # None, so users only opt in to what they need. Schema mirrors icrgui 1:1.
     args: list[str] = ["--core", body.core]
-    if body.bank_id:
-        bank_file = await _export_bank_for_launch(bank_repo, body.bank_id)
-        args += ["--soundbank-file", str(bank_file)]
 
     def _str_or_none(v: object) -> str | None:
         return str(v) if v else None
 
-    # --soundbank-dir: prefer explicit settings.soundbank_dir, else
-    # fall back to the first legacy bank_dirs entry.
-    sb_dir = _str_or_none(settings.get("soundbank_dir"))
-    if sb_dir is None:
-        bank_dirs = settings.get("bank_dirs") or []
-        if isinstance(bank_dirs, list) and bank_dirs:
-            sb_dir = _str_or_none(bank_dirs[0])
-    if sb_dir:
-        args += ["--soundbank-dir", sb_dir]
+    if body.bank_id:
+        bank_file = await _export_bank_for_launch(bank_repo, body.bank_id)
+        args += ["--soundbank-file", str(bank_file)]
 
-    ir_file = _str_or_none(settings.get("ir_file"))
-    if ir_file:
-        args += ["--ir-file", ir_file]
-    ir_dir = _str_or_none(settings.get("ir_dir"))
-    if ir_dir:
-        args += ["--ir-dir", ir_dir]
+    # Soundbank directory — single source of truth. Also used by the ingest
+    # script, so keeping it at the top level avoids two places to configure.
+    bank_dir = _str_or_none(settings.get("bank_dir"))
+    if bank_dir:
+        args += ["--soundbank-dir", bank_dir]
 
-    ec_file = _str_or_none(settings.get("engine_config_file"))
-    if ec_file:
-        args += ["--engine-config-file", ec_file]
-    ec_dir = _str_or_none(settings.get("engine_config_dir"))
-    if ec_dir:
-        args += ["--engine-config-dir", ec_dir]
-
-    # Per-core SynthConfig overlay — passthrough of settings.core_config_file.
-    cc_file = _str_or_none(settings.get("core_config_file"))
-    if cc_file:
-        args += ["--core-config-file", cc_file]
+    # Engine overrides — a grouped namespace so the mapping to icrgui's flags
+    # is obvious on inspection of the YAML.
+    eng = settings.get("engine") or {}
+    if isinstance(eng, dict):
+        for key, flag in (
+            ("ir_file",          "--ir-file"),
+            ("ir_dir",           "--ir-dir"),
+            ("config_file",      "--engine-config-file"),
+            ("config_dir",       "--engine-config-dir"),
+            ("core_config_file", "--core-config-file"),
+        ):
+            value = _str_or_none(eng.get(key))
+            if value:
+                args += [flag, value]
 
     # MIDI: push the editor-side port pair into icrgui with SWAPPED direction.
     # Editor's OUTPUT (where we send SysEx) is engine's INPUT; editor's INPUT
     # (where we listen for PONG) is engine's OUTPUT. Without this, the user
-    # has to manually pick ports inside icrgui every launch.
+    # has to re-pick ports inside icrgui every launch.
     midi_cfg = settings.get("midi") or {}
     if isinstance(midi_cfg, dict):
-        editor_out = _str_or_none(midi_cfg.get("default_output"))
-        editor_in = _str_or_none(midi_cfg.get("default_input"))
+        editor_out = _str_or_none(midi_cfg.get("output"))
+        editor_in = _str_or_none(midi_cfg.get("input"))
         if editor_out:
             args += ["--midi-in", editor_out]
         if editor_in:

@@ -118,26 +118,20 @@ export function IcrRunnerPanel({bankId, midi, velocity}: Props) {
       parts.push('--soundbank-file');
       parts.push(quote(`<temp>/icr-viz-launch/${bankId}.icr.json`));
     }
-    const sbDir = (s.soundbank_dir as string | null | undefined)
-      ?? ((s.bank_dirs as string[] | undefined) ?? [])[0];
-    if (sbDir) parts.push('--soundbank-dir', quote(sbDir));
+    const bankDir = s.bank_dir as string | null | undefined;
+    if (bankDir) parts.push('--soundbank-dir', quote(bankDir));
 
-    const irFile = s.ir_file as string | null | undefined;
-    if (irFile) parts.push('--ir-file', quote(irFile));
-    const irDir = s.ir_dir as string | null | undefined;
-    if (irDir) parts.push('--ir-dir', quote(irDir));
-
-    const ecFile = s.engine_config_file as string | null | undefined;
-    if (ecFile) parts.push('--engine-config-file', quote(ecFile));
-    const ecDir = s.engine_config_dir as string | null | undefined;
-    if (ecDir) parts.push('--engine-config-dir', quote(ecDir));
-    const ccFile = s.core_config_file as string | null | undefined;
-    if (ccFile) parts.push('--core-config-file', quote(ccFile));
+    const eng = (s.engine as Record<string, string | null | undefined> | undefined) ?? {};
+    if (eng.ir_file)          parts.push('--ir-file', quote(eng.ir_file));
+    if (eng.ir_dir)           parts.push('--ir-dir', quote(eng.ir_dir));
+    if (eng.config_file)      parts.push('--engine-config-file', quote(eng.config_file));
+    if (eng.config_dir)       parts.push('--engine-config-dir', quote(eng.config_dir));
+    if (eng.core_config_file) parts.push('--core-config-file', quote(eng.core_config_file));
 
     // MIDI: engine uses the OPPOSITE end of each port vs. the editor.
-    const midi = (s.midi as {default_input?: string | null; default_output?: string | null} | undefined) ?? {};
-    if (midi.default_output) parts.push('--midi-in', quote(midi.default_output));
-    if (midi.default_input) parts.push('--midi-out', quote(midi.default_input));
+    const midi = (s.midi as {input?: string | null; output?: string | null} | undefined) ?? {};
+    if (midi.output) parts.push('--midi-in', quote(midi.output));
+    if (midi.input)  parts.push('--midi-out', quote(midi.input));
 
     return parts.join(' ');
   })();

@@ -149,8 +149,8 @@ export function MidiBridgePanel({requiresBank}: Props) {
             type="button"
             onClick={() => saveMut.mutate({
               midi: {
-                default_input: inputName,
-                default_output: outputName,
+                input: inputName,
+                output: outputName,
               },
             })}
             disabled={!canSave || saveMut.isPending}

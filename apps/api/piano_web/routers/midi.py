@@ -303,8 +303,8 @@ async def connect(body: ConnectBody, bridge: BridgeDep) -> StatusResponse:
     try:
         from piano_web import settings as _settings
         _settings.save({"midi": {
-            "default_input": s.input_port_name,
-            "default_output": s.output_port_name,
+            "input": s.input_port_name,
+            "output": s.output_port_name,
         }})
     except Exception as exc:
         logger.warning("midi.connect.settings_save_failed", extra={"detail": str(exc)})
